@@ -1,6 +1,3 @@
-[submodule "crates/const-identify"]
-	path = crates/const-identify
-	url = git@github.com:rhedgeco/const-identify.git
 [submodule "crates/imposters"]
 	path = crates/imposters
 	url = git@github.com:rhedgeco/imposters.git
