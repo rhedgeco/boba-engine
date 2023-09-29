@@ -1,26 +1,57 @@
-use const_identify::{ConstId, ConstIdentify};
-use imposters::{collections::vec::ImposterVec, Imposter};
+pub mod array;
+pub mod query;
 
-/// Marker trait for any struct that is a valid `boba-ecs` component
-pub trait Component: ConstIdentify + Send + Sync + 'static {
-    fn const_id(&self) -> ConstId;
+pub use array::{ComponentIdArray, ComponentIdSlice};
+use imposters::{collections::vec::ImposterVec, Imposter};
+pub use query::{ComponentQuery, ComponentQueryArray, ComponentQuerySlice};
+
+use const_fnv1a_hash::fnv1a_hash_str_64;
+
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ComponentId {
+    value: u64,
 }
 
-impl<T: ConstIdentify + Send + Sync + 'static> Component for T {
-    fn const_id(&self) -> ConstId {
-        Self::CONST_ID
+impl ComponentId {
+    pub const fn hash_str(str: &str) -> Self {
+        Self {
+            value: fnv1a_hash_str_64(str),
+        }
+    }
+
+    pub const fn from_raw(value: u64) -> Self {
+        Self { value }
+    }
+
+    pub const fn raw_value(&self) -> u64 {
+        self.value
+    }
+}
+
+pub unsafe trait Component: Send + Sync + 'static {
+    const COMPONENT_ID: ComponentId;
+}
+
+pub trait ComponentExt: Component {
+    fn component_id(&self) -> ComponentId;
+}
+
+impl<T: Component> ComponentExt for T {
+    fn component_id(&self) -> ComponentId {
+        Self::COMPONENT_ID
     }
 }
 
 pub struct AnyComponent {
-    id: ConstId,
+    id: ComponentId,
     imposter: Imposter,
 }
 
 impl<T: Component> From<Box<T>> for AnyComponent {
     fn from(value: Box<T>) -> Self {
         Self {
-            id: T::CONST_ID,
+            id: T::COMPONENT_ID,
             imposter: value.into(),
         }
     }
@@ -31,7 +62,7 @@ impl AnyComponent {
         Box::new(component).into()
     }
 
-    pub fn const_id(&self) -> ConstId {
+    pub fn component_id(&self) -> ComponentId {
         self.id
     }
 
@@ -58,14 +89,14 @@ impl AnyComponent {
 }
 
 pub struct AnyComponentVec {
-    id: ConstId,
+    id: ComponentId,
     vec: ImposterVec,
 }
 
 impl AnyComponentVec {
     pub fn new<T: Component>() -> Self {
         Self {
-            id: T::CONST_ID,
+            id: T::COMPONENT_ID,
             vec: ImposterVec::new::<T>(),
         }
     }
@@ -77,7 +108,7 @@ impl AnyComponentVec {
         }
     }
 
-    pub fn const_id(&self) -> ConstId {
+    pub fn component_id(&self) -> ComponentId {
         self.id
     }
 

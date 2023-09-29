@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+const-fnv1a-hash = "1.1"
 imposters = { path = "../imposters" }
-const-identify = { path = "../const-identify" }
+boba-ecs-macros = { path = "./macros" }
