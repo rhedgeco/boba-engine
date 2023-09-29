@@ -1,0 +1,10 @@
+[package]
+name = "boba-engine"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["crates/*"]
+
+[dependencies]
+boba-ecs = { path = "./crates/boba-ecs" }

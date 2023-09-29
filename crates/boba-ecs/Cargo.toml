@@ -1,0 +1,8 @@
+[package]
+name = "boba-ecs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+imposters = { path = "../imposters" }
+const-identify = { path = "../const-identify" }
