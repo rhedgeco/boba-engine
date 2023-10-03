@@ -39,7 +39,14 @@ pub struct ComponentQueryArray<const SIZE: usize> {
 }
 
 impl<const SIZE: usize> ComponentQueryArray<SIZE> {
-    pub const fn new(queries: [ComponentQuery; SIZE]) -> Option<Self> {
+    pub const fn build(queries: [ComponentQuery; SIZE]) -> Self {
+        match Self::try_build(queries) {
+            Some(array) => array,
+            None => panic!("ComponentQueryArrays cannot contain duplicate ids"),
+        }
+    }
+
+    pub const fn try_build(queries: [ComponentQuery; SIZE]) -> Option<Self> {
         let ordered = queries;
         let mut sorted = queries;
 
@@ -76,7 +83,8 @@ impl<const SIZE: usize> ComponentQueryArray<SIZE> {
             ids[index] = sorted[index].id();
             index += 1;
         }
-        let Some(ids) = ComponentIdArray::build(ids) else {
+
+        let Some(ids) = ComponentIdArray::try_build(ids) else {
             return None;
         };
 
@@ -120,15 +128,6 @@ impl<const SIZE: usize> ComponentQueryArray<SIZE> {
         other: &ComponentQueryArray<SIZE2>,
     ) -> bool {
         alias_overlaps(self.as_sorted_slice(), other.as_sorted_slice())
-    }
-}
-
-pub const fn unwrap_query<const SIZE: usize>(
-    option: Option<ComponentQueryArray<SIZE>>,
-) -> ComponentQueryArray<SIZE> {
-    match option {
-        Some(array) => array,
-        None => panic!("Duplicate ids detected in query"),
     }
 }
 

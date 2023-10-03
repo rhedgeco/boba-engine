@@ -1,6 +1,5 @@
 pub mod component;
 pub mod entity;
-pub mod query;
 
 pub use component::{Component, ComponentId};
 pub use entity::Entity;

@@ -8,7 +8,14 @@ pub struct ComponentIdArray<const SIZE: usize> {
 }
 
 impl<const SIZE: usize> ComponentIdArray<SIZE> {
-    pub const fn build(mut ids: [ComponentId; SIZE]) -> Option<Self> {
+    pub const fn build(ids: [ComponentId; SIZE]) -> Self {
+        match Self::try_build(ids) {
+            Some(array) => array,
+            None => panic!("ComponentIdArrays cannot contain duplicate ids."),
+        }
+    }
+
+    pub const fn try_build(mut ids: [ComponentId; SIZE]) -> Option<Self> {
         // bubble sort
         loop {
             let mut i = 1;
@@ -54,15 +61,6 @@ impl<const SIZE: usize> ComponentIdArray<SIZE> {
         other: &ComponentIdArray<SIZE2>,
     ) -> Ordering {
         const_cmp(self.as_raw_slice(), other.as_raw_slice())
-    }
-}
-
-pub const fn unwrap_array<const SIZE: usize>(
-    option: Option<ComponentIdArray<SIZE>>,
-) -> ComponentIdArray<SIZE> {
-    match option {
-        Some(array) => array,
-        None => panic!("Duplicate ids detected in query"),
     }
 }
 
