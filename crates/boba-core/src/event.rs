@@ -7,7 +7,7 @@ use crate::{
         map::{MultiPearlMap, PearlAccess},
         PearlExt, PearlId,
     },
-    Pearl,
+    Pearl, Resources,
 };
 
 /// Marker trait that designates a struct can be used to trigger a [`World`](crate::World) event.
@@ -15,7 +15,7 @@ pub trait Event: 'static {}
 impl<T: 'static> Event for T {}
 
 pub trait EventListener<E: Event>: Pearl {
-    fn update(event: &mut E, pearls: &mut PearlAccess<Self>);
+    fn update(event: &mut E, pearls: &mut PearlAccess<Self>, resources: &mut Resources);
 }
 
 pub trait EventRegister<P: Pearl> {
@@ -24,7 +24,7 @@ pub trait EventRegister<P: Pearl> {
         P: EventListener<E>;
 }
 
-type EventRunner<E> = fn(&mut E, &mut MultiPearlMap);
+type EventRunner<E> = fn(&mut E, &mut MultiPearlMap, &mut Resources);
 
 #[derive(Default)]
 pub struct EventRegistry {
@@ -58,24 +58,33 @@ impl EventRegistry {
         Self::default()
     }
 
-    pub fn trigger<E: Event>(&mut self, event: &mut E, map: &mut MultiPearlMap) {
+    pub fn trigger<E: Event>(
+        &mut self,
+        event: &mut E,
+        map: &mut MultiPearlMap,
+        resources: &mut Resources,
+    ) {
         let Some(runners) = self.runners.get(&TypeId::of::<E>()) else {
             return;
         };
 
         for any in runners {
             let runner = any.downcast_ref::<EventRunner<E>>();
-            runner.expect("Internal Error: Faulty downcast")(event, map);
+            runner.expect("Internal Error: Faulty downcast")(event, map, resources);
         }
     }
 
-    fn runner<E: Event, P: Pearl + EventListener<E>>(data: &mut E, map: &mut MultiPearlMap) {
+    fn runner<E: Event, P: Pearl + EventListener<E>>(
+        data: &mut E,
+        map: &mut MultiPearlMap,
+        resources: &mut Resources,
+    ) {
         let Some(mut stream) = map.stream::<P>() else {
             return;
         };
 
         while let Some(mut access) = stream.next_access() {
-            P::update(data, &mut access)
+            P::update(data, &mut access, resources)
         }
     }
 }

@@ -1,7 +1,8 @@
 use crate::{
     event::EventRegistry,
     pearl::map::{Handle, MultiPearlMap},
-    Event, Pearl,
+    resources::Resource,
+    Event, Pearl, Resources,
 };
 
 /// The central data structure of `boba-core` that holds all the `Pearl` structs and resources.
@@ -9,6 +10,7 @@ use crate::{
 pub struct World {
     events: EventRegistry,
     pearls: MultiPearlMap,
+    resources: Resources,
 }
 
 impl World {
@@ -30,9 +32,24 @@ impl World {
         self.pearls.remove_now(handle)
     }
 
+    /// Inserts or replaces a global [`Resource`] into this world.
+    ///
+    /// If a resource of this type already exists, the old one will be returned.
+    pub fn insert_resource<R: Resource>(&mut self, resource: R) -> Option<R> {
+        self.resources.insert(resource)
+    }
+
+    /// Removes and returns a global [`Resource`] into this world.
+    ///
+    /// Returns `None` if the resource does not exist
+    pub fn remove_resource<R: Resource>(&mut self) -> Option<R> {
+        self.resources.remove()
+    }
+
     /// Triggers an [`Event`] in this world.
     /// Any [`Pearl`] that is registered to listen for these events will be updated.
     pub fn trigger<E: Event>(&mut self, event: &mut E) {
-        self.events.trigger::<E>(event, &mut self.pearls);
+        self.events
+            .trigger::<E>(event, &mut self.pearls, &mut self.resources);
     }
 }
