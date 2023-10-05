@@ -72,6 +72,9 @@ impl EventRegistry {
             let runner = any.downcast_ref::<EventRunner<E>>();
             runner.expect("Internal Error: Faulty downcast")(event, map, resources);
         }
+
+        // flush all insertions and deletions into map
+        map.flush_all();
     }
 
     fn runner<E: Event, P: Pearl + EventListener<E>>(
@@ -79,7 +82,7 @@ impl EventRegistry {
         map: &mut MultiPearlMap,
         resources: &mut Resources,
     ) {
-        let Some(mut stream) = map.stream::<P>() else {
+        let Some(mut stream) = map.access_stream::<P>() else {
             return;
         };
 
