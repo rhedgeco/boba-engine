@@ -226,7 +226,7 @@ impl MultiPearlMap {
         self.get_map_mut::<P>().map(|map| map.flush_queue());
     }
 
-    pub fn flush_all<P: Pearl>(&mut self) {
+    pub fn flush_all(&mut self) {
         for anymap in &mut self.pearl_maps {
             anymap.flush_queue()
         }
@@ -258,9 +258,9 @@ impl MultiPearlMap {
         Some(pearls.iter_mut())
     }
 
-    pub fn stream<P: Pearl>(&mut self) -> Option<PearlStream<P>> {
+    pub fn access_stream<P: Pearl>(&mut self) -> Option<PearlAccessStream<P>> {
         let map_index = *self.map_index.get(&P::id())?;
-        Some(PearlStream::new(map_index, self))
+        Some(PearlAccessStream::new(map_index, self))
     }
 
     fn get_or_create_map<P: Pearl>(&mut self) -> &mut PearlMap<P> {
@@ -280,14 +280,14 @@ impl MultiPearlMap {
     }
 }
 
-pub struct PearlStream<'a, P: Pearl> {
+pub struct PearlAccessStream<'a, P: Pearl> {
     map_index: usize,
     pearl_index: usize,
     source: &'a mut MultiPearlMap,
     _type: PhantomData<*const P>,
 }
 
-impl<'a, P: Pearl> PearlStream<'a, P> {
+impl<'a, P: Pearl> PearlAccessStream<'a, P> {
     fn new(map_index: usize, source: &'a mut MultiPearlMap) -> Self {
         Self {
             map_index,
