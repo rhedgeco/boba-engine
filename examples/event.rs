@@ -1,13 +1,8 @@
 use boba_engine::prelude::*;
 
+#[pearl(listen(String))]
 pub struct Test1 {
     item: u32,
-}
-
-impl Pearl for Test1 {
-    fn register(register: &mut impl EventRegister<Self>) {
-        register.event::<String>()
-    }
 }
 
 impl EventListener<String> for Test1 {

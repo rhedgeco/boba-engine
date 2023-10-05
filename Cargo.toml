@@ -8,3 +8,4 @@ members = ["crates/*"]
 
 [dependencies]
 boba-core = { path = "./crates/boba-core" }
+boba-proc = { path = "./crates/boba-proc" }
