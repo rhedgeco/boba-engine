@@ -1,0 +1,9 @@
+[package]
+name = "boba-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fxhash = "0.2"
+imposters = { path = "../imposters" }
+handle-map = { path = "../handle-map" }
