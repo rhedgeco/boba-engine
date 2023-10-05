@@ -355,4 +355,12 @@ impl<'a, T: Pearl> PearlAccess<'a, T> {
     pub fn queue_destroy<P: Pearl>(&mut self, handle: Handle<P>) -> bool {
         self.source.queue_destroy(handle)
     }
+
+    pub fn iter<P: Pearl>(&self) -> Option<Iter<P>> {
+        self.source.iter()
+    }
+
+    pub fn iter_mut<P: Pearl>(&mut self) -> Option<IterMut<P>> {
+        self.source.iter_mut()
+    }
 }
