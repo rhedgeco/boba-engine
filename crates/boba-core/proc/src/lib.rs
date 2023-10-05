@@ -38,8 +38,8 @@ pub fn pearl(args: TokenStream, item: TokenStream) -> TokenStream {
     let output = quote! {
         #item
 
-        impl #implgen ::boba_engine::core::Pearl for #ident #typegen #wheregen {
-            fn register(register: &mut impl ::boba_engine::core::EventRegister<Self>) {
+        impl #implgen ::boba_core::Pearl for #ident #typegen #wheregen {
+            fn register(register: &mut impl ::boba_core::EventRegister<Self>) {
                 #registers
             }
         }

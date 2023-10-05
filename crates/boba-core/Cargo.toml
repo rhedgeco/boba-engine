@@ -7,3 +7,4 @@ edition = "2021"
 fxhash = "0.2"
 imposters = { path = "../imposters" }
 handle-map = { path = "../handle-map" }
+boba-core-proc = { path = "./proc" }
