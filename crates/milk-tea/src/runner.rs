@@ -1,6 +1,33 @@
 use boba_core::arena::BobaArena;
+use std::time::Instant;
 
-use crate::events::MilkTeaUpdater;
+pub struct Update {
+    delta_time: f64,
+}
+
+impl Update {
+    fn new(delta_time: f64) -> Self {
+        Self { delta_time }
+    }
+
+    pub fn delta_time(&self) -> f64 {
+        self.delta_time
+    }
+}
+
+pub struct LateUpdate {
+    delta_time: f64,
+}
+
+impl LateUpdate {
+    fn new(delta_time: f64) -> Self {
+        Self { delta_time }
+    }
+
+    pub fn delta_time(&self) -> f64 {
+        self.delta_time
+    }
+}
 
 #[derive(Default)]
 pub struct MilkTeaSettings {
@@ -19,6 +46,7 @@ impl MilkTeaSettings {
 
 #[derive(Default)]
 pub struct MilkTeaRunner {
+    instant: Option<Instant>,
     pub arena: BobaArena,
 }
 
@@ -28,8 +56,6 @@ impl MilkTeaRunner {
     }
 
     pub fn run(&mut self) {
-        let mut updater = MilkTeaUpdater::new();
-
         loop {
             match self.arena.resources().get::<MilkTeaSettings>() {
                 Some(settings) => {
@@ -44,7 +70,15 @@ impl MilkTeaRunner {
                 }
             }
 
-            updater.update(&mut self.arena);
+            let now = Instant::now();
+            let delta_time = match self.instant {
+                Some(last) => now.duration_since(last).as_secs_f64(),
+                None => 0f64,
+            };
+            self.instant = Some(now);
+
+            self.arena.trigger(&mut Update::new(delta_time));
+            self.arena.trigger(&mut LateUpdate::new(delta_time));
         }
     }
 }
