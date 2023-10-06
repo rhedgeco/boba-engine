@@ -7,4 +7,5 @@ edition = "2021"
 members = ["crates/*"]
 
 [dependencies]
+milk-tea = { path = "./crates/milk-tea" }
 boba-core = { path = "./crates/boba-core" }

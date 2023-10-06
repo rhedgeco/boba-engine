@@ -27,6 +27,14 @@ impl World {
         self.pearls.insert_now(pearl)
     }
 
+    pub fn get_pearl<P: Pearl>(&self, handle: Handle<P>) -> Option<&P> {
+        self.pearls.get(handle)
+    }
+
+    pub fn get_pearl_mut<P: Pearl>(&mut self, handle: Handle<P>) -> Option<&mut P> {
+        self.pearls.get_mut(handle)
+    }
+
     /// Removes a [`Pearl`] if it exists from the world using its [`Handle`].
     pub fn remove_pearl<P: Pearl>(&mut self, handle: Handle<P>) -> Option<P> {
         self.pearls.remove_now(handle)
@@ -37,6 +45,14 @@ impl World {
     /// If a resource of this type already exists, the old one will be returned.
     pub fn insert_resource<R: Resource>(&mut self, resource: R) -> Option<R> {
         self.resources.insert(resource)
+    }
+
+    pub fn get_resource<R: Resource>(&self) -> Option<&R> {
+        self.resources.get()
+    }
+
+    pub fn get_resource_mut<R: Resource>(&mut self) -> Option<&mut R> {
+        self.resources.get_mut()
     }
 
     /// Removes and returns a global [`Resource`] into this world.
