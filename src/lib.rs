@@ -3,7 +3,9 @@ pub use milk_tea;
 
 pub mod prelude {
     pub use crate::core::{
-        pearl, Event, EventListener, EventRegister, Pearl, PearlAccess, Resources, World,
+        pearl,
+        pearl::collections::{PearlArena, PearlArenaView},
+        Event, EventListener, EventRegister, Pearl, Resources,
     };
     pub use milk_tea::{
         events::{LateUpdate, Update},

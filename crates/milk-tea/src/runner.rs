@@ -1,4 +1,4 @@
-use boba_core::World;
+use boba_core::{pearl::collections::PearlArena, Resources};
 
 use crate::events::MilkTeaUpdater;
 
@@ -19,30 +19,31 @@ impl MilkTeaSettings {
 
 #[derive(Default)]
 pub struct MilkTeaRunner {
-    pub world: World,
+    pub pearls: PearlArena,
+    pub resources: Resources,
 }
 
 impl MilkTeaRunner {
-    pub fn new(world: World) -> Self {
-        Self { world }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn run(&mut self) {
         let mut updater = MilkTeaUpdater::new();
 
         loop {
-            match self.world.get_resource::<MilkTeaSettings>() {
+            match self.resources.get::<MilkTeaSettings>() {
                 Some(settings) => {
                     if settings.exit {
                         break;
                     }
                 }
                 None => {
-                    self.world.insert_resource(MilkTeaSettings::default());
+                    self.resources.insert(MilkTeaSettings::default());
                 }
             }
 
-            updater.update(&mut self.world);
+            updater.update(&mut self.pearls, &mut self.resources);
         }
     }
 }

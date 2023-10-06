@@ -1,4 +1,4 @@
-pub mod map;
+pub mod collections;
 
 use std::any::TypeId;
 
