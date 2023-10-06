@@ -377,6 +377,10 @@ impl<'a, T: Pearl> PearlArenaView<'a, T> {
         self.source.iter_mut()
     }
 
+    pub fn trigger<E: Event>(&mut self, event: &mut E, resources: &mut Resources) {
+        self.source.trigger(event, resources);
+    }
+
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
         self.source.insert(pearl)
     }

@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData, mem::transmute};
+use std::{hash::Hash, marker::PhantomData};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct RawHandle {
@@ -85,17 +85,7 @@ impl<T> Handle<T> {
     /// it may not behave as expected. A handle should usually be used on the map it is associated with.
     #[inline]
     pub fn into_type<U>(self) -> Handle<U> {
-        unsafe { transmute(self) }
-    }
-
-    /// Transforms a handle reference into another types handle
-    ///
-    /// # Warning
-    /// While this is not unsafe and will not cause undefined behavior on its own,
-    /// it may not behave as expected. A handle should usually be used on the map it is associated with.
-    #[inline]
-    pub fn as_type<U>(&self) -> &Handle<U> {
-        unsafe { transmute(self) }
+        Handle::from_raw(self.raw)
     }
 
     // Returns the underlying `u64` used as an id for this handle

@@ -124,24 +124,6 @@ impl<T> DenseHandleMap<T> {
         Some(self.data.swap_remove(index))
     }
 
-    /// Returns a reference to the underlying packed slice of data
-    #[inline]
-    pub fn as_slice(&self) -> &[T] {
-        &self.data
-    }
-
-    /// Returns a reference to the underlying packed slice of data handles
-    #[inline]
-    pub fn as_handles_slice(&self) -> &[Handle<T>] {
-        unsafe { std::mem::transmute(self.back_link.as_slice()) }
-    }
-
-    /// Returns a mutable reference to the underlying packed slice of data
-    #[inline]
-    pub fn as_slice_mut(&mut self) -> &mut [T] {
-        &mut self.data
-    }
-
     /// Consumes the map, and returns the underlying vec of items
     #[inline]
     pub fn into_vec(self) -> Vec<T> {

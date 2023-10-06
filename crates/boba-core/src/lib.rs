@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 pub mod event;
 pub mod pearl;
 pub mod resources;
