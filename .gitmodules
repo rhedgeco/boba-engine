@@ -1,3 +1,0 @@
-[submodule "crates/imposters"]
-	path = crates/imposters
-	url = git@github.com:rhedgeco/imposters.git
