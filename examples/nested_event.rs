@@ -12,26 +12,30 @@ impl Event for StringEvent {
 }
 
 #[pearl(listen(Update, StringEvent))]
-pub struct NestTrigger;
+pub struct NestTrigger {
+    value: usize,
+}
 
 impl EventListener<Update> for NestTrigger {
     fn update(_: &Update, arena: &mut ArenaView<Self>) {
-        println!("BASE UPDATE CALL");
+        let value = arena.current_pearl().value;
+        println!("BASE UPDATE CALL from {value}");
         arena.trigger(&mut StringEvent {
-            string: format!("NESTED CALL"),
+            string: format!("NESTED CALL from {value}"),
         });
     }
 }
 
 impl EventListener<StringEvent> for NestTrigger {
-    fn update(string: &str, _: &mut ArenaView<Self>) {
-        println!("STRING EVENT: {string}");
+    fn update(string: &str, arena: &mut ArenaView<Self>) {
+        let value = arena.current_pearl().value;
+        println!("STRING EVENT on {value}: {string}");
     }
 }
 
 fn main() {
     let mut milk_tea = MilkTeaRunner::default();
-    milk_tea.arena.insert(NestTrigger);
-    milk_tea.arena.insert(NestTrigger);
+    milk_tea.arena.insert(NestTrigger { value: 1 });
+    milk_tea.arena.insert(NestTrigger { value: 2 });
     milk_tea.run();
 }
