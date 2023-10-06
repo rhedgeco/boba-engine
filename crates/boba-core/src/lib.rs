@@ -1,9 +1,11 @@
 #![forbid(unsafe_code)]
 
+pub mod arena;
 pub mod event;
 pub mod pearl;
 pub mod resources;
 
+pub use arena::{ArenaView, BobaArena};
 pub use event::{Event, EventListener, EventRegister};
 pub use pearl::Pearl;
 pub use resources::Resources;

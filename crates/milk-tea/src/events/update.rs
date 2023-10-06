@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use boba_core::{pearl::collections::PearlArena, Resources};
+use boba_core::arena::BobaArena;
 
 pub struct MilkTeaUpdater {
     instant: Option<Instant>,
@@ -11,7 +11,7 @@ impl MilkTeaUpdater {
         Self { instant: None }
     }
 
-    pub fn update(&mut self, pearls: &mut PearlArena, resources: &mut Resources) {
+    pub fn update(&mut self, arena: &mut BobaArena) {
         let now = Instant::now();
         let delta_time = match self.instant {
             Some(last) => now.duration_since(last).as_secs_f64(),
@@ -19,8 +19,8 @@ impl MilkTeaUpdater {
         };
         self.instant = Some(now);
 
-        pearls.trigger(&mut Update { delta_time }, resources);
-        pearls.trigger(&mut LateUpdate { delta_time }, resources);
+        arena.trigger(&mut Update { delta_time });
+        arena.trigger(&mut LateUpdate { delta_time });
     }
 }
 

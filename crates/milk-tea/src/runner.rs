@@ -1,4 +1,4 @@
-use boba_core::{pearl::collections::PearlArena, Resources};
+use boba_core::arena::BobaArena;
 
 use crate::events::MilkTeaUpdater;
 
@@ -19,8 +19,7 @@ impl MilkTeaSettings {
 
 #[derive(Default)]
 pub struct MilkTeaRunner {
-    pub pearls: PearlArena,
-    pub resources: Resources,
+    pub arena: BobaArena,
 }
 
 impl MilkTeaRunner {
@@ -32,18 +31,20 @@ impl MilkTeaRunner {
         let mut updater = MilkTeaUpdater::new();
 
         loop {
-            match self.resources.get::<MilkTeaSettings>() {
+            match self.arena.resources().get::<MilkTeaSettings>() {
                 Some(settings) => {
                     if settings.exit {
                         break;
                     }
                 }
                 None => {
-                    self.resources.insert(MilkTeaSettings::default());
+                    self.arena
+                        .resources_mut()
+                        .insert(MilkTeaSettings::default());
                 }
             }
 
-            updater.update(&mut self.pearls, &mut self.resources);
+            updater.update(&mut self.arena);
         }
     }
 }

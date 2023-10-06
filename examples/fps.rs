@@ -4,7 +4,7 @@ use boba_engine::prelude::*;
 pub struct FpsPrinter;
 
 impl EventListener<Update> for FpsPrinter {
-    fn update(event: &mut Update, _: &mut PearlArenaView<Self>, _: &mut Resources) {
+    fn update(event: &mut Update, _: &mut ArenaView<Self>) {
         let fps = 1f64 / event.delta_time();
         println!("FPS: {fps}");
     }
@@ -12,6 +12,6 @@ impl EventListener<Update> for FpsPrinter {
 
 fn main() {
     let mut milk_tea = MilkTeaRunner::default();
-    milk_tea.pearls.insert(FpsPrinter);
+    milk_tea.arena.insert(FpsPrinter);
     milk_tea.run();
 }

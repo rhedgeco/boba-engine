@@ -1,157 +1,15 @@
-use super::{PearlExt, PearlId};
-use crate::{Event, EventListener, EventRegister, Pearl, Resources};
+use crate::{
+    pearl::{
+        Handle, Iter, IterMut, PearlEntry, PearlExt, PearlId, PearlMap, RawHandle, UntypedPearlMap,
+    },
+    Event, EventListener, EventRegister, Pearl, Resources,
+};
 use fxhash::{FxBuildHasher, FxHashMap};
-use handle_map::map::sparse::SparseHandleMap;
 use indexmap::IndexMap;
 use std::{
     any::{Any, TypeId},
     marker::PhantomData,
-    ops::{Deref, DerefMut},
 };
-
-pub type RawHandle = handle_map::RawHandle;
-pub type Handle<P> = handle_map::Handle<P>;
-pub type Iter<'a, P> = std::slice::Iter<'a, PearlEntry<P>>;
-pub type IterMut<'a, P> = std::slice::IterMut<'a, PearlEntry<P>>;
-
-#[derive(Debug)]
-pub struct PearlEntry<P: Pearl> {
-    handle: Handle<P>,
-    pearl: P,
-}
-
-impl<P: Pearl> PearlEntry<P> {
-    fn new(handle: Handle<P>, pearl: P) -> Self {
-        Self { handle, pearl }
-    }
-
-    pub fn handle(&self) -> Handle<P> {
-        self.handle
-    }
-}
-
-impl<P: Pearl> DerefMut for PearlEntry<P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.pearl
-    }
-}
-
-impl<P: Pearl> Deref for PearlEntry<P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        &self.pearl
-    }
-}
-
-#[derive(Debug)]
-pub struct PearlMap<P: Pearl> {
-    links: SparseHandleMap<usize>,
-    pearls: Vec<PearlEntry<P>>,
-}
-
-impl<P: Pearl> Default for PearlMap<P> {
-    fn default() -> Self {
-        Self {
-            links: Default::default(),
-            pearls: Default::default(),
-        }
-    }
-}
-
-impl<P: Pearl> PearlMap<P> {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn len(&self) -> usize {
-        self.pearls.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.pearls.is_empty()
-    }
-
-    pub fn contains(&self, handle: Handle<P>) -> bool {
-        self.links.contains(handle.into_type())
-    }
-
-    pub fn get(&self, handle: Handle<P>) -> Option<&P> {
-        let index = *self.links.get_data(handle.into_type())?;
-        Some(&self.pearls[index].pearl)
-    }
-
-    pub fn get_mut(&mut self, handle: Handle<P>) -> Option<&mut P> {
-        let index = *self.links.get_data(handle.into_type())?;
-        Some(&mut self.pearls[index].pearl)
-    }
-
-    pub fn iter(&self) -> Iter<P> {
-        self.pearls.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> IterMut<P> {
-        self.pearls.iter_mut()
-    }
-
-    pub fn insert(&mut self, pearl: P) -> Handle<P> {
-        let handle = self.links.insert(self.pearls.len()).into_type();
-        self.pearls.push(PearlEntry::new(handle, pearl));
-        handle
-    }
-
-    pub fn remove(&mut self, handle: Handle<P>) -> Option<P> {
-        let index = self.links.remove(handle.into_type())?;
-        let removed = self.pearls.swap_remove(index).pearl;
-        if let Some(swapped) = self.pearls.get_mut(index) {
-            self.links
-                .get_data_mut(swapped.handle.into_type())
-                .map(|i| *i = index);
-        }
-
-        Some(removed)
-    }
-}
-
-pub trait UntypedPearlMap: Any {
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn contains(&self, raw: RawHandle) -> bool;
-    fn pearl_id(&self) -> PearlId;
-    fn destroy(&mut self, raw: RawHandle);
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-
-impl<P: Pearl> UntypedPearlMap for PearlMap<P> {
-    fn len(&self) -> usize {
-        self.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.is_empty()
-    }
-
-    fn contains(&self, raw: RawHandle) -> bool {
-        self.contains(Handle::from_raw(raw))
-    }
-
-    fn pearl_id(&self) -> PearlId {
-        P::id()
-    }
-
-    fn destroy(&mut self, raw: RawHandle) {
-        self.remove(Handle::from_raw(raw));
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
 
 pub enum MapStatus<T> {
     New(T),
@@ -182,12 +40,12 @@ impl<T> MapStatus<T> {
 }
 
 #[derive(Default)]
-pub struct AnyPearlMap {
+pub struct ArenaPearls {
     map_index: FxHashMap<PearlId, usize>,
     pearl_maps: Vec<Box<dyn UntypedPearlMap>>,
 }
 
-impl AnyPearlMap {
+impl ArenaPearls {
     pub fn new() -> Self {
         Default::default()
     }
@@ -259,12 +117,13 @@ impl AnyPearlMap {
 }
 
 #[derive(Default)]
-pub struct PearlArena {
+pub struct BobaArena {
     events: ArenaEventRegistry,
-    anymap: AnyPearlMap,
+    anymap: ArenaPearls,
+    resources: Resources,
 }
 
-impl PearlArena {
+impl BobaArena {
     pub fn new() -> Self {
         Self::default()
     }
@@ -285,6 +144,14 @@ impl PearlArena {
         self.anymap.iter_mut()
     }
 
+    pub fn resources(&self) -> &Resources {
+        &self.resources
+    }
+
+    pub fn resources_mut(&mut self) -> &mut Resources {
+        &mut self.resources
+    }
+
     pub fn remove<P: Pearl>(&mut self, handle: Handle<P>) -> Option<P> {
         self.anymap.remove(handle)
     }
@@ -299,7 +166,7 @@ impl PearlArena {
         }
     }
 
-    pub fn trigger<E: Event>(&mut self, event: &mut E, resources: &mut Resources) {
+    pub fn trigger<E: Event>(&mut self, event: &mut E) {
         let Some(vec_index) = self.events.index_map.get(&TypeId::of::<E>()).map(|i| *i) else {
             return;
         };
@@ -311,22 +178,22 @@ impl PearlArena {
                 .downcast_ref::<Vec<EventRunner<E>>>()
                 .expect("Internal Error: Faulty downcast")[runner_index];
 
-            runner(event, self, resources);
+            runner(event, self);
             runner_index += 1;
         }
     }
 }
 
-pub struct PearlArenaView<'a, P: Pearl> {
+pub struct ArenaView<'a, P: Pearl> {
     map_index: usize,
     pearl_index: usize,
-    source: &'a mut PearlArena,
+    source: &'a mut BobaArena,
     destroy_queue: IndexMap<PearlId, Vec<RawHandle>, FxBuildHasher>,
     _type: PhantomData<*const P>,
 }
 
-impl<'a, T: Pearl> PearlArenaView<'a, T> {
-    fn create_view(map_index: usize, source: &'a mut PearlArena) -> Option<Self> {
+impl<'a, T: Pearl> ArenaView<'a, T> {
+    fn create_view(map_index: usize, source: &'a mut BobaArena) -> Option<Self> {
         let pearl_map = &source.anymap.pearl_maps[map_index];
         if pearl_map.is_empty() {
             return None;
@@ -377,8 +244,16 @@ impl<'a, T: Pearl> PearlArenaView<'a, T> {
         self.source.iter_mut()
     }
 
-    pub fn trigger<E: Event>(&mut self, event: &mut E, resources: &mut Resources) {
-        self.source.trigger(event, resources);
+    pub fn trigger<E: Event>(&mut self, event: &mut E) {
+        self.source.trigger(event);
+    }
+
+    pub fn resources(&self) -> &Resources {
+        self.source.resources()
+    }
+
+    pub fn resources_mut(&mut self) -> &mut Resources {
+        self.source.resources_mut()
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
@@ -396,14 +271,14 @@ impl<'a, T: Pearl> PearlArenaView<'a, T> {
         }
     }
 
-    pub fn current(&self) -> &PearlEntry<T> {
+    pub fn current_pearl(&self) -> &PearlEntry<T> {
         let anymap = self.source.anymap.pearl_maps[self.map_index].as_any();
         let pearl_map = anymap.downcast_ref::<PearlMap<T>>();
         let pearl_map = pearl_map.expect("Internal Error: Faulty downcast");
         &pearl_map.pearls[self.pearl_index]
     }
 
-    pub fn current_mut(&mut self) -> &mut PearlEntry<T> {
+    pub fn current_pearl_mut(&mut self) -> &mut PearlEntry<T> {
         let anymap = self.source.anymap.pearl_maps[self.map_index].as_any_mut();
         let pearl_map = anymap.downcast_mut::<PearlMap<T>>();
         let pearl_map = pearl_map.expect("Internal Error: Faulty downcast");
@@ -411,7 +286,7 @@ impl<'a, T: Pearl> PearlArenaView<'a, T> {
     }
 }
 
-type EventRunner<E> = fn(&mut E, &mut PearlArena, &mut Resources);
+type EventRunner<E> = fn(&mut E, &mut BobaArena);
 
 #[derive(Default)]
 struct ArenaEventRegistry {
@@ -442,22 +317,18 @@ impl<P: Pearl> EventRegister<P> for ArenaEventRegistry {
 }
 
 impl ArenaEventRegistry {
-    fn runner<E: Event, P: EventListener<E>>(
-        event: &mut E,
-        pearls: &mut PearlArena,
-        resources: &mut Resources,
-    ) {
+    fn runner<E: Event, P: EventListener<E>>(event: &mut E, pearls: &mut BobaArena) {
         let Some(map_index) = pearls.anymap.map_index.get(&P::id()) else {
             return;
         };
 
-        let Some(mut arena_view) = PearlArenaView::<P>::create_view(*map_index, pearls) else {
+        let Some(mut arena_view) = ArenaView::<P>::create_view(*map_index, pearls) else {
             return;
         };
 
-        P::update(event, &mut arena_view, resources);
+        P::update(event, &mut arena_view);
         while arena_view.next_view() {
-            P::update(event, &mut arena_view, resources);
+            P::update(event, &mut arena_view);
         }
     }
 }
