@@ -208,11 +208,11 @@ impl<'a, T: Pearl> ArenaView<'a, T> {
         })
     }
 
-    fn next_view(&mut self) -> bool {
+    fn next_view(mut self) -> Option<Self> {
         self.pearl_index += 1;
         let pearl_map = &self.source.anymap.pearl_maps[self.map_index];
         if self.pearl_index >= pearl_map.len() {
-            for (id, handles) in self.destroy_queue.drain(..) {
+            for (id, handles) in self.destroy_queue {
                 let Some(map_index) = self.source.anymap.map_index.get(&id) else {
                     continue;
                 };
@@ -222,10 +222,10 @@ impl<'a, T: Pearl> ArenaView<'a, T> {
                 }
             }
 
-            return false;
+            return None;
         }
 
-        true
+        Some(self)
     }
 
     pub fn get<P: Pearl>(&mut self, handle: Handle<P>) -> Option<&P> {
@@ -326,9 +326,12 @@ impl ArenaEventRegistry {
             return;
         };
 
-        P::update(event, &mut arena_view);
-        while arena_view.next_view() {
+        loop {
             P::update(event, &mut arena_view);
+            match arena_view.next_view() {
+                Some(next) => arena_view = next,
+                None => break,
+            }
         }
     }
 }
