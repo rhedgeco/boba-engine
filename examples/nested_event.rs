@@ -1,17 +1,30 @@
 use boba_engine::prelude::*;
 
-#[pearl(listen(Update, String))]
-pub struct NestTrigger;
+struct StringEvent {
+    string: String,
+}
 
-impl EventListener<Update> for NestTrigger {
-    fn update(_: &mut Update, arena: &mut ArenaView<Self>) {
-        println!("BASE UPDATE CALL");
-        arena.trigger(&mut format!("NESTED CALL"));
+impl Event for StringEvent {
+    type Data<'a> = &'a str;
+    fn event_data<'a>(&'a mut self) -> Self::Data<'a> {
+        &self.string
     }
 }
 
-impl EventListener<String> for NestTrigger {
-    fn update(string: &mut String, _: &mut ArenaView<Self>) {
+#[pearl(listen(Update, StringEvent))]
+pub struct NestTrigger;
+
+impl EventListener<Update> for NestTrigger {
+    fn update(_: &Update, arena: &mut ArenaView<Self>) {
+        println!("BASE UPDATE CALL");
+        arena.trigger(&mut StringEvent {
+            string: format!("NESTED CALL"),
+        });
+    }
+}
+
+impl EventListener<StringEvent> for NestTrigger {
+    fn update(string: &str, _: &mut ArenaView<Self>) {
         println!("STRING EVENT: {string}");
     }
 }

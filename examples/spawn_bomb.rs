@@ -6,7 +6,7 @@ pub struct SpawnBomb {
 }
 
 impl EventListener<Update> for SpawnBomb {
-    fn update(_: &mut Update, arena: &mut ArenaView<Self>) {
+    fn update(_: &Update, arena: &mut ArenaView<Self>) {
         let index = arena.current_pearl().index;
         println!("I AM INFINITE - {index}");
         arena.insert(SpawnBomb { index: index + 1 });

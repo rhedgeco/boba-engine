@@ -1,8 +1,15 @@
-use boba_core::arena::BobaArena;
+use boba_core::{arena::BobaArena, Event};
 use std::time::Instant;
 
 pub struct Update {
     delta_time: f64,
+}
+
+impl Event for Update {
+    type Data<'a> = &'a Self;
+    fn event_data<'a>(&'a mut self) -> Self::Data<'a> {
+        self
+    }
 }
 
 impl Update {
@@ -17,6 +24,13 @@ impl Update {
 
 pub struct LateUpdate {
     delta_time: f64,
+}
+
+impl Event for LateUpdate {
+    type Data<'a> = &'a Self;
+    fn event_data<'a>(&'a mut self) -> Self::Data<'a> {
+        self
+    }
 }
 
 impl LateUpdate {

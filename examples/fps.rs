@@ -4,7 +4,7 @@ use boba_engine::prelude::*;
 pub struct FpsPrinter;
 
 impl EventListener<Update> for FpsPrinter {
-    fn update(event: &mut Update, _: &mut ArenaView<Self>) {
+    fn update(event: &Update, _: &mut ArenaView<Self>) {
         let fps = 1f64 / event.delta_time();
         println!("FPS: {fps}");
     }

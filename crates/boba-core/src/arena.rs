@@ -327,7 +327,7 @@ impl ArenaEventRegistry {
         };
 
         loop {
-            P::update(event, &mut arena_view);
+            P::update(event.event_data(), &mut arena_view);
             match arena_view.next_view() {
                 Some(next) => arena_view = next,
                 None => break,

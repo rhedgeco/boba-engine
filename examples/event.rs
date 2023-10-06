@@ -1,12 +1,23 @@
 use boba_engine::prelude::*;
 
-#[pearl(listen(String))]
+struct StringEvent {
+    string: String,
+}
+
+impl Event for StringEvent {
+    type Data<'a> = &'a str;
+    fn event_data<'a>(&'a mut self) -> Self::Data<'a> {
+        &self.string
+    }
+}
+
+#[pearl(listen(StringEvent))]
 pub struct Test1 {
     item: u32,
 }
 
-impl EventListener<String> for Test1 {
-    fn update(event: &mut String, arena: &mut ArenaView<Self>) {
+impl EventListener<StringEvent> for Test1 {
+    fn update(event: &str, arena: &mut ArenaView<Self>) {
         let item = arena.current_pearl().item;
         let resource = arena.resources().get::<TestResource>().unwrap().item;
         println!("Got event: {event} on pearl Test1 {{ item: {item} }} with resource {resource}");
@@ -22,5 +33,7 @@ fn main() {
     arena.insert(Test1 { item: 42 });
     arena.insert(Test1 { item: 69 });
     arena.resources_mut().insert(TestResource { item: 1234 });
-    arena.trigger(&mut format!("String Event"));
+    arena.trigger(&mut StringEvent {
+        string: format!("String Event"),
+    });
 }
