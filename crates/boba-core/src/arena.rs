@@ -54,6 +54,14 @@ impl ArenaPearls {
         self.pearl_maps.len()
     }
 
+    pub fn map_len<P: Pearl>(&self) -> usize {
+        let Some(index) = self.map_index.get(&P::id()) else {
+            return 0;
+        };
+
+        self.pearl_maps[*index].len()
+    }
+
     pub fn get_map<P: Pearl>(&self) -> Option<&PearlMap<P>> {
         let index = *self.map_index.get(&P::id())?;
         self.pearl_maps[index].as_any().downcast_ref()
