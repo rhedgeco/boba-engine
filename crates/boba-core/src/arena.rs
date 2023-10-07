@@ -2,6 +2,7 @@ use crate::{
     pearl::{
         Handle, Iter, IterMut, PearlEntry, PearlExt, PearlId, PearlMap, RawHandle, UntypedPearlMap,
     },
+    resources::Resource,
     Event, EventListener, EventRegister, Pearl, Resources,
 };
 use fxhash::{FxBuildHasher, FxHashMap};
@@ -140,8 +141,16 @@ impl BobaArena {
         self.anymap.get(handle)
     }
 
+    pub fn get_resource<R: Resource>(&self) -> Option<&R> {
+        self.resources.get()
+    }
+
     pub fn get_mut<P: Pearl>(&mut self, handle: Handle<P>) -> Option<&P> {
         self.anymap.get(handle)
+    }
+
+    pub fn get_resource_mut<R: Resource>(&mut self) -> Option<&mut R> {
+        self.resources.get_mut()
     }
 
     pub fn iter<P: Pearl>(&self) -> Option<Iter<P>> {
@@ -152,16 +161,12 @@ impl BobaArena {
         self.anymap.iter_mut()
     }
 
-    pub fn resources(&self) -> &Resources {
-        &self.resources
-    }
-
-    pub fn resources_mut(&mut self) -> &mut Resources {
-        &mut self.resources
-    }
-
     pub fn remove<P: Pearl>(&mut self, handle: Handle<P>) -> Option<P> {
         self.anymap.remove(handle)
+    }
+
+    pub fn remove_resource<R: Resource>(&mut self) -> Option<R> {
+        self.resources.remove()
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
@@ -172,6 +177,10 @@ impl BobaArena {
                 handle
             }
         }
+    }
+
+    pub fn insert_resource<R: Resource>(&mut self, resource: R) -> Option<R> {
+        self.resources.insert(resource)
     }
 
     pub fn trigger<E: Event>(&mut self, event: &mut E) {
@@ -240,8 +249,16 @@ impl<'a, T: Pearl> ArenaView<'a, T> {
         self.source.get(handle)
     }
 
+    pub fn get_resource<R: Resource>(&self) -> Option<&R> {
+        self.source.get_resource()
+    }
+
     pub fn get_mut<P: Pearl>(&mut self, handle: Handle<P>) -> Option<&P> {
         self.source.get(handle)
+    }
+
+    pub fn get_resource_mut<R: Resource>(&mut self) -> Option<&mut R> {
+        self.source.get_resource_mut()
     }
 
     pub fn iter<P: Pearl>(&self) -> Option<Iter<P>> {
@@ -256,16 +273,16 @@ impl<'a, T: Pearl> ArenaView<'a, T> {
         self.source.trigger(event);
     }
 
-    pub fn resources(&self) -> &Resources {
-        self.source.resources()
-    }
-
-    pub fn resources_mut(&mut self) -> &mut Resources {
-        self.source.resources_mut()
-    }
-
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
         self.source.insert(pearl)
+    }
+
+    pub fn insert_resource<R: Resource>(&mut self, resource: R) -> Option<R> {
+        self.source.insert_resource(resource)
+    }
+
+    pub fn remove_resource<R: Resource>(&mut self) -> Option<R> {
+        self.source.remove_resource()
     }
 
     pub fn queue_destroy<P: Pearl>(&mut self, handle: Handle<P>) {
