@@ -1,14 +1,8 @@
 use boba_engine::prelude::*;
 
-struct StringEvent {
-    string: String,
-}
-
+struct StringEvent;
 impl Event for StringEvent {
     type Data<'a> = &'a str;
-    fn event_data<'a>(&'a mut self) -> Self::Data<'a> {
-        &self.string
-    }
 }
 
 #[pearl(listen(StringEvent))]
@@ -17,23 +11,24 @@ pub struct Test1 {
 }
 
 impl EventListener<StringEvent> for Test1 {
-    fn update(event: &str, arena: &mut ArenaView<Self>) {
-        let item = arena.current_pearl().item;
-        let resource = arena.resources().get::<TestResource>().unwrap().item;
-        println!("Got event: {event} on pearl Test1 {{ item: {item} }} with resource {resource}");
+    fn update(event: &mut &str, world: &mut BobaWorld) {
+        let global = world.get_global::<TestResource>().unwrap().item;
+        for test in world.iter::<Test1>() {
+            let item = test.item;
+            println!("Got event: {event} on pearl Test1 {{ item: {item} }} with global {global}");
+        }
     }
 }
 
+#[pearl]
 struct TestResource {
     item: u32,
 }
 
 fn main() {
-    let mut arena = BobaArena::new();
-    arena.insert(Test1 { item: 42 });
-    arena.insert(Test1 { item: 69 });
-    arena.resources_mut().insert(TestResource { item: 1234 });
-    arena.trigger(&mut StringEvent {
-        string: format!("String Event"),
-    });
+    let mut world = BobaWorld::new();
+    world.insert(Test1 { item: 42 });
+    world.insert(Test1 { item: 69 });
+    world.insert_global(TestResource { item: 1234 });
+    world.trigger::<StringEvent>("String Event");
 }
