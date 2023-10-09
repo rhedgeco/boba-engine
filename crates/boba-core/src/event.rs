@@ -1,20 +1,15 @@
-use crate::{arena::ArenaView, Pearl};
+use crate::{BobaWorld, Pearl};
 
-/// Designates a struct can be used to trigger a [`World`](crate::World) event.
+/// Designates that a struct can be used to trigger an event in a [`BobaWorld`]
 pub trait Event: 'static {
-    /// Data type that is passed into am [`EventListener`]
+    /// The data that will be passed into the triggered event
     type Data<'a>;
-
-    /// Provides the data necessary for an event update
-    ///
-    /// This will be called for every [`EventListener`]
-    fn event_data<'a>(&'a mut self) -> Self::Data<'a>;
 }
 
 /// Trait that defines a callback for an [`Event`]
 pub trait EventListener<E: Event>: Pearl {
-    /// [`Event`] callback function
-    fn update<'a>(event: E::Data<'a>, pearls: &mut ArenaView<Self>);
+    // /// [`Event`] callback function
+    fn update<'a>(event: &mut E::Data<'a>, world: &mut BobaWorld);
 }
 
 /// Registers [`EventListener`] callbacks available to `P`

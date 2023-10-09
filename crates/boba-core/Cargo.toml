@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-fxhash = "0.2"
 indexmap = "2.0"
-handle-map = { path = "../handle-map" }
+const-fnv1a-hash = "1.1"
 boba-core-proc = { path = "./proc" }
+handle-map = { path = "../handle-map" }

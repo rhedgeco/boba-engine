@@ -1,14 +1,12 @@
-#![forbid(unsafe_code)]
-
-pub mod arena;
 pub mod event;
 pub mod pearl;
-pub mod resources;
+pub mod world;
 
-pub use arena::{ArenaView, BobaArena};
 pub use event::{Event, EventListener, EventRegister};
 pub use pearl::Pearl;
-pub use resources::Resources;
+pub use world::BobaWorld;
 
-extern crate self as boba_core;
+// re-export proc macros
 pub use boba_core_proc::pearl;
+// place self into extern scope for usage proc macros
+extern crate self as boba_core;
