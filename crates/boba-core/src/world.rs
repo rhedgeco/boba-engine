@@ -45,7 +45,7 @@ impl BobaWorld {
         *any.downcast().expect("Internal Error: Faulty downcast")
     }
 
-    pub fn insert_listener<E: Event>(&mut self, callback: EventRunner<E>) {
+    pub fn insert_callback<E: Event>(&mut self, callback: EventRunner<E>) {
         self.event_registry.insert_callback(callback);
     }
 
