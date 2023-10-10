@@ -6,5 +6,4 @@ edition = "2021"
 [dependencies]
 indexmap = "2.0"
 const-fnv1a-hash = "1.1"
-boba-core-proc = { path = "./proc" }
 handle-map = { path = "../handle-map" }

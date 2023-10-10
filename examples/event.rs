@@ -5,9 +5,14 @@ impl Event for StringEvent {
     type Data<'a> = &'a str;
 }
 
-#[pearl(listen(StringEvent))]
 pub struct Test1 {
     item: u32,
+}
+
+impl Pearl for Test1 {
+    fn register(register: &mut impl EventRegister<Self>) {
+        register.event::<StringEvent>();
+    }
 }
 
 impl EventListener<StringEvent> for Test1 {
@@ -20,7 +25,7 @@ impl EventListener<StringEvent> for Test1 {
     }
 }
 
-#[pearl]
+impl Pearl for TestResource {}
 struct TestResource {
     item: u32,
 }

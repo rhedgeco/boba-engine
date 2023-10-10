@@ -1,11 +1,16 @@
-use boba_core::{pearl, EventListener};
+use boba_core::{EventListener, EventRegister, Pearl};
 use winit::window::Window;
 
 use crate::events::MilkTeaUpdate;
 
-#[pearl(listen(MilkTeaUpdate))]
 pub struct WindowBuilder {
     pub title: String,
+}
+
+impl Pearl for WindowBuilder {
+    fn register(register: &mut impl EventRegister<Self>) {
+        register.event::<MilkTeaUpdate>();
+    }
 }
 
 impl EventListener<MilkTeaUpdate> for WindowBuilder {
@@ -38,10 +43,11 @@ impl EventListener<MilkTeaUpdate> for WindowBuilder {
     }
 }
 
-#[pearl]
 pub struct MilkTeaWindow {
     window: Window,
 }
+
+impl Pearl for MilkTeaWindow {}
 
 impl MilkTeaWindow {
     pub fn window(&self) -> &Window {
