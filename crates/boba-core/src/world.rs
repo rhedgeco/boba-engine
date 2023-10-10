@@ -1,12 +1,70 @@
 use crate::{
-    pearl::{Handle, Iter, IterMut, PearlEntry, PearlExt, PearlId, PearlMap, UntypedPearlMap},
+    pearl::{
+        Handle, Iter, PearlEntry, PearlExt, PearlId, PearlMap, PearlMut, PearlRef, UntypedPearlMap,
+    },
     Event, EventListener, EventRegister, Pearl,
 };
 use indexmap::IndexMap;
 use std::{
     any::{Any, TypeId},
+    cell::{Ref, RefCell, RefMut},
     collections::HashSet,
+    ops::{Deref, DerefMut},
 };
+
+pub struct GlobalEntry<P: Pearl> {
+    pearl: RefCell<P>,
+}
+
+impl<P: Pearl> GlobalEntry<P> {
+    pub(crate) fn new(pearl: P) -> Self {
+        Self {
+            pearl: RefCell::new(pearl),
+        }
+    }
+}
+
+impl<P: Pearl> GlobalEntry<P> {
+    pub fn borrow(&self) -> Option<GlobalRef<P>> {
+        let pearl = self.pearl.try_borrow().ok()?;
+        Some(GlobalRef { pearl })
+    }
+
+    pub fn borrow_mut(&self) -> Option<GlobalMut<P>> {
+        let pearl = self.pearl.try_borrow_mut().ok()?;
+        Some(GlobalMut { pearl })
+    }
+}
+
+pub struct GlobalRef<'a, P: Pearl> {
+    pearl: Ref<'a, P>,
+}
+
+impl<'a, P: Pearl> Deref for GlobalRef<'a, P> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        self.pearl.deref()
+    }
+}
+
+pub struct GlobalMut<'a, P: Pearl> {
+    pearl: RefMut<'a, P>,
+}
+
+impl<'a, P: Pearl> DerefMut for GlobalMut<'a, P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.pearl.deref_mut()
+    }
+}
+
+impl<'a, P: Pearl> Deref for GlobalMut<'a, P> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        self.pearl.deref()
+    }
+}
 
 #[derive(Default)]
 pub struct BobaWorld {
@@ -20,20 +78,26 @@ impl BobaWorld {
         Self::default()
     }
 
-    pub fn get<P: Pearl>(&mut self, handle: Handle<P>) -> Option<&P> {
+    pub fn get<P: Pearl>(&self, handle: Handle<P>) -> Option<PearlRef<P>> {
         self.get_map()?.get(handle)
     }
 
-    pub fn get_global<P: Pearl>(&self) -> Option<&P> {
-        self.global_pearls.get(&P::id())?.downcast_ref()
+    pub fn get_global<P: Pearl>(&self) -> Option<GlobalRef<P>> {
+        let any = self.global_pearls.get(&P::id())?;
+        let global = any.downcast_ref::<GlobalEntry<P>>();
+        let global = global.expect("Internal Error: Faulty downcast");
+        global.borrow()
     }
 
-    pub fn get_mut<P: Pearl>(&mut self, handle: Handle<P>) -> Option<&mut P> {
-        self.get_map_mut()?.get_mut(handle)
+    pub fn get_mut<P: Pearl>(&self, handle: Handle<P>) -> Option<PearlMut<P>> {
+        self.get_map()?.get_mut(handle)
     }
 
-    pub fn get_global_mut<P: Pearl>(&mut self) -> Option<&mut P> {
-        self.global_pearls.get_mut(&P::id())?.downcast_mut()
+    pub fn get_global_mut<P: Pearl>(&self) -> Option<GlobalMut<P>> {
+        let any = self.global_pearls.get(&P::id())?;
+        let global = any.downcast_ref::<GlobalEntry<P>>();
+        let global = global.expect("Internal Error: Faulty downcast");
+        global.borrow_mut()
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
@@ -43,9 +107,10 @@ impl BobaWorld {
     }
 
     pub fn insert_global<P: Pearl>(&mut self, pearl: P) -> Option<P> {
-        let any = self.global_pearls.insert(P::id(), Box::new(pearl))?;
+        let global = Box::new(GlobalEntry::new(pearl));
+        let any = self.global_pearls.insert(P::id(), global);
         P::on_insert_global(self);
-        *any.downcast().expect("Internal Error: Faulty downcast")
+        *any?.downcast().expect("Internal Error: Faulty downcast")
     }
 
     pub fn insert_callback<E: Event>(&mut self, callback: EventRunner<E>) {
@@ -60,7 +125,8 @@ impl BobaWorld {
 
     pub fn remove_global<P: Pearl>(&mut self) -> Option<P> {
         let any = self.global_pearls.remove(&P::id())?;
-        let mut pearl: P = *any.downcast().expect("Internal Error: Faulty downcast");
+        let pearl: GlobalEntry<P> = *any.downcast().expect("Internal Error: Faulty downcast");
+        let mut pearl = pearl.pearl.into_inner();
         pearl.on_remove_global(self);
         Some(pearl)
     }
@@ -71,16 +137,6 @@ impl BobaWorld {
             None => {
                 let empty: &[PearlEntry<P>] = &[];
                 empty.iter()
-            }
-        }
-    }
-
-    pub fn iter_mut<P: Pearl>(&mut self) -> IterMut<P> {
-        match self.get_map_mut() {
-            Some(map) => map.iter_mut(),
-            None => {
-                let empty: &mut [PearlEntry<P>] = &mut [];
-                empty.iter_mut()
             }
         }
     }

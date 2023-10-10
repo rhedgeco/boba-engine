@@ -2,13 +2,13 @@ use crate::{event::EventRegister, BobaWorld};
 use handle_map::map::sparse::SparseHandleMap;
 use std::{
     any::{Any, TypeId},
+    cell::{Ref, RefCell, RefMut},
     ops::{Deref, DerefMut},
 };
 
 pub type RawHandle = handle_map::RawHandle;
 pub type Handle<P> = handle_map::Handle<P>;
 pub type Iter<'a, P> = std::slice::Iter<'a, PearlEntry<P>>;
-pub type IterMut<'a, P> = std::slice::IterMut<'a, PearlEntry<P>>;
 
 /// A general data type that can be inserted into a [`World`](crate::World).
 #[allow(unused_variables)]
@@ -57,12 +57,31 @@ impl<T: Pearl> PearlExt for T {
 #[derive(Debug)]
 pub struct PearlEntry<P: Pearl> {
     handle: Handle<P>,
-    pearl: P,
+    pearl: RefCell<P>,
 }
 
 impl<P: Pearl> PearlEntry<P> {
     fn new(handle: Handle<P>, pearl: P) -> Self {
-        Self { handle, pearl }
+        Self {
+            handle,
+            pearl: RefCell::new(pearl),
+        }
+    }
+
+    pub fn borrow(&self) -> Option<PearlRef<P>> {
+        let pearl = self.pearl.try_borrow().ok()?;
+        Some(PearlRef {
+            handle: self.handle,
+            pearl,
+        })
+    }
+
+    pub fn borrow_mut(&self) -> Option<PearlMut<P>> {
+        let pearl = self.pearl.try_borrow_mut().ok()?;
+        Some(PearlMut {
+            handle: self.handle,
+            pearl,
+        })
     }
 
     pub fn handle(&self) -> Handle<P> {
@@ -70,17 +89,47 @@ impl<P: Pearl> PearlEntry<P> {
     }
 }
 
-impl<P: Pearl> DerefMut for PearlEntry<P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.pearl
+pub struct PearlRef<'a, P: Pearl> {
+    handle: Handle<P>,
+    pearl: Ref<'a, P>,
+}
+
+impl<'a, P: Pearl> PearlRef<'a, P> {
+    pub fn handle(&self) -> Handle<P> {
+        self.handle
     }
 }
 
-impl<P: Pearl> Deref for PearlEntry<P> {
+impl<'a, P: Pearl> Deref for PearlRef<'a, P> {
     type Target = P;
 
     fn deref(&self) -> &Self::Target {
-        &self.pearl
+        self.pearl.deref()
+    }
+}
+
+pub struct PearlMut<'a, P: Pearl> {
+    handle: Handle<P>,
+    pearl: RefMut<'a, P>,
+}
+
+impl<'a, P: Pearl> PearlMut<'a, P> {
+    pub fn handle(&self) -> Handle<P> {
+        self.handle
+    }
+}
+
+impl<'a, P: Pearl> DerefMut for PearlMut<'a, P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.pearl.deref_mut()
+    }
+}
+
+impl<'a, P: Pearl> Deref for PearlMut<'a, P> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        self.pearl.deref()
     }
 }
 
@@ -116,22 +165,18 @@ impl<P: Pearl> PearlMap<P> {
         self.links.contains(handle.into_type())
     }
 
-    pub fn get(&self, handle: Handle<P>) -> Option<&P> {
+    pub fn get(&self, handle: Handle<P>) -> Option<PearlRef<P>> {
         let index = *self.links.get_data(handle.into_type())?;
-        Some(&self.pearls[index].pearl)
+        self.pearls[index].borrow()
     }
 
-    pub fn get_mut(&mut self, handle: Handle<P>) -> Option<&mut P> {
+    pub fn get_mut(&self, handle: Handle<P>) -> Option<PearlMut<P>> {
         let index = *self.links.get_data(handle.into_type())?;
-        Some(&mut self.pearls[index].pearl)
+        self.pearls[index].borrow_mut()
     }
 
     pub fn iter(&self) -> Iter<P> {
         self.pearls.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> IterMut<P> {
-        self.pearls.iter_mut()
     }
 
     pub fn insert(&mut self, pearl: P) -> Handle<P> {
@@ -149,7 +194,7 @@ impl<P: Pearl> PearlMap<P> {
                 .map(|i| *i = index);
         }
 
-        Some(removed)
+        Some(removed.into_inner())
     }
 }
 

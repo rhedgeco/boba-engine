@@ -18,7 +18,7 @@ impl Pearl for Test1 {
 impl EventListener<StringEvent> for Test1 {
     fn update(event: &mut &str, world: &mut BobaWorld) {
         let global = world.get_global::<TestResource>().unwrap().item;
-        for test in world.iter::<Test1>() {
+        for test in world.iter::<Test1>().filter_map(|e| e.borrow()) {
             let item = test.item;
             println!("Got event: {event} on pearl Test1 {{ item: {item} }} with global {global}");
         }

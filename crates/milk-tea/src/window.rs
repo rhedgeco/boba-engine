@@ -20,7 +20,7 @@ impl EventListener<MilkTeaUpdate> for WindowBuilder {
     ) {
         let mut remove_queue = Vec::new();
         let mut insert_queue = Vec::new();
-        for builder in world.iter::<Self>() {
+        for builder in world.iter::<Self>().filter_map(|e| e.borrow()) {
             remove_queue.push(builder.handle());
             match Window::new(event.window_target()) {
                 Err(e) => {
