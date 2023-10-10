@@ -1,7 +1,7 @@
-use boba_core::{pearl, BobaWorld, EventListener};
+use boba_core::{pearl, EventListener};
 use winit::window::Window;
 
-use crate::events::{MilkTeaUpdate, UpdateData};
+use crate::events::MilkTeaUpdate;
 
 #[pearl(listen(MilkTeaUpdate))]
 pub struct WindowBuilder {
@@ -9,10 +9,13 @@ pub struct WindowBuilder {
 }
 
 impl EventListener<MilkTeaUpdate> for WindowBuilder {
-    fn update<'a>(event: &mut UpdateData, world: &mut BobaWorld) {
+    fn update<'a>(
+        event: &mut <MilkTeaUpdate as boba_core::Event>::Data<'a>,
+        world: &mut boba_core::BobaWorld,
+    ) {
         let mut remove_queue = Vec::new();
         let mut insert_queue = Vec::new();
-        for builder in world.pearls.iter::<Self>() {
+        for builder in world.iter::<Self>() {
             remove_queue.push(builder.handle());
             match Window::new(event.window_target()) {
                 Err(e) => {
@@ -26,11 +29,11 @@ impl EventListener<MilkTeaUpdate> for WindowBuilder {
         }
 
         for handle in remove_queue {
-            world.pearls.remove(handle);
+            world.remove(handle);
         }
 
         for window in insert_queue {
-            world.pearls.insert(window);
+            world.insert(window);
         }
     }
 }
