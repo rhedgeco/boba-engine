@@ -37,11 +37,14 @@ impl BobaWorld {
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
-        self.get_or_create_map().insert(pearl)
+        let handle = self.get_or_create_map().insert(pearl);
+        P::on_insert(handle, self);
+        handle
     }
 
     pub fn insert_global<P: Pearl>(&mut self, pearl: P) -> Option<P> {
         let any = self.global_pearls.insert(P::id(), Box::new(pearl))?;
+        P::on_insert_global(self);
         *any.downcast().expect("Internal Error: Faulty downcast")
     }
 
@@ -50,12 +53,16 @@ impl BobaWorld {
     }
 
     pub fn remove<P: Pearl>(&mut self, handle: Handle<P>) -> Option<P> {
-        self.get_map_mut()?.remove(handle)
+        let mut pearl = self.get_map_mut()?.remove(handle)?;
+        pearl.on_remove(self);
+        Some(pearl)
     }
 
     pub fn remove_global<P: Pearl>(&mut self) -> Option<P> {
         let any = self.global_pearls.remove(&P::id())?;
-        *any.downcast().expect("Internal Error: Faulty downcast")
+        let mut pearl: P = *any.downcast().expect("Internal Error: Faulty downcast");
+        pearl.on_remove_global(self);
+        Some(pearl)
     }
 
     pub fn iter<P: Pearl>(&self) -> Iter<P> {
