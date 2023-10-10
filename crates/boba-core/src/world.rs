@@ -10,7 +10,7 @@ use std::{
 
 #[derive(Default)]
 pub struct BobaWorld {
-    resources: IndexMap<TypeId, Box<dyn Any>>,
+    global_pearls: IndexMap<PearlId, Box<dyn Any>>,
     pearl_maps: IndexMap<PearlId, Box<dyn UntypedPearlMap>>,
     event_registry: EventRegistry,
 }
@@ -24,25 +24,24 @@ impl BobaWorld {
         self.get_map()?.get(handle)
     }
 
-    pub fn get_resource<R: 'static>(&self) -> Option<&R> {
-        self.resources.get(&TypeId::of::<R>())?.downcast_ref()
+    pub fn get_global<P: Pearl>(&self) -> Option<&P> {
+        self.global_pearls.get(&P::id())?.downcast_ref()
     }
 
     pub fn get_mut<P: Pearl>(&mut self, handle: Handle<P>) -> Option<&mut P> {
         self.get_map_mut()?.get_mut(handle)
     }
 
-    pub fn get_resource_mut<R: 'static>(&mut self) -> Option<&mut R> {
-        self.resources.get_mut(&TypeId::of::<R>())?.downcast_mut()
+    pub fn get_global_mut<P: Pearl>(&mut self) -> Option<&mut P> {
+        self.global_pearls.get_mut(&P::id())?.downcast_mut()
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
         self.get_or_create_map().insert(pearl)
     }
 
-    pub fn insert_resource<R: 'static>(&mut self, resource: R) -> Option<R> {
-        let id = TypeId::of::<R>();
-        let any = self.resources.insert(id, Box::new(resource))?;
+    pub fn insert_global<P: Pearl>(&mut self, pearl: P) -> Option<P> {
+        let any = self.global_pearls.insert(P::id(), Box::new(pearl))?;
         *any.downcast().expect("Internal Error: Faulty downcast")
     }
 
@@ -54,8 +53,8 @@ impl BobaWorld {
         self.get_map_mut()?.remove(handle)
     }
 
-    pub fn remove_resource<R: 'static>(&mut self) -> Option<R> {
-        let any = self.resources.remove(&TypeId::of::<R>())?;
+    pub fn remove_global<P: Pearl>(&mut self) -> Option<P> {
+        let any = self.global_pearls.remove(&P::id())?;
         *any.downcast().expect("Internal Error: Faulty downcast")
     }
 

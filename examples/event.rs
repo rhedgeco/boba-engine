@@ -12,7 +12,7 @@ pub struct Test1 {
 
 impl EventListener<StringEvent> for Test1 {
     fn update(event: &mut &str, world: &mut BobaWorld) {
-        let global = world.get_resource::<TestResource>().unwrap().item;
+        let global = world.get_global::<TestResource>().unwrap().item;
         for test in world.iter::<Test1>() {
             let item = test.item;
             println!("Got event: {event} on pearl Test1 {{ item: {item} }} with global {global}");
@@ -20,6 +20,7 @@ impl EventListener<StringEvent> for Test1 {
     }
 }
 
+#[pearl]
 struct TestResource {
     item: u32,
 }
@@ -28,6 +29,6 @@ fn main() {
     let mut world = BobaWorld::new();
     world.insert(Test1 { item: 42 });
     world.insert(Test1 { item: 69 });
-    world.insert_resource(TestResource { item: 1234 });
+    world.insert_global(TestResource { item: 1234 });
     world.trigger::<StringEvent>("String Event");
 }
