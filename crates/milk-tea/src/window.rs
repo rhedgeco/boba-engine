@@ -3,54 +3,57 @@ use winit::window::Window;
 
 use crate::events::MilkTeaUpdate;
 
-pub struct WindowBuilder {
+pub struct WindowConfig {
     pub title: String,
 }
 
-impl Pearl for WindowBuilder {
+pub struct MilkTeaWindow {
+    init_config: WindowConfig,
+    window: Option<Window>,
+}
+
+impl Pearl for MilkTeaWindow {
     fn register(register: &mut impl EventRegister<Self>) {
         register.event::<MilkTeaUpdate>();
     }
 }
 
-impl EventListener<MilkTeaUpdate> for WindowBuilder {
+impl EventListener<MilkTeaUpdate> for MilkTeaWindow {
     fn update<'a>(
         event: &mut <MilkTeaUpdate as boba_core::Event>::Data<'a>,
         world: &mut boba_core::BobaWorld,
     ) {
         let mut remove_queue = Vec::new();
-        let mut insert_queue = Vec::new();
-        for builder in world.iter::<Self>().filter_map(|e| e.borrow()) {
-            remove_queue.push(builder.handle());
-            match Window::new(event.window_target()) {
+        for mut window in world.iter::<MilkTeaWindow>().filter_map(|e| e.borrow_mut()) {
+            if window.window.is_some() {
+                continue;
+            }
+
+            let new_window = match Window::new(event.window_target()) {
+                Ok(window) => window,
                 Err(e) => {
-                    eprintln!("Failed to create window: {e}");
-                }
-                Ok(window) => {
-                    window.set_title(&builder.title);
-                    insert_queue.push(MilkTeaWindow { window });
+                    remove_queue.push(window.handle());
+                    let title = &window.init_config.title;
+                    eprintln!("Failed to create window '{title}': {e}");
+                    continue;
                 }
             };
-        }
 
-        for handle in remove_queue {
-            world.remove(handle);
-        }
-
-        for window in insert_queue {
-            world.insert(window);
+            new_window.set_title(&window.init_config.title);
+            window.window = Some(new_window);
         }
     }
 }
 
-pub struct MilkTeaWindow {
-    window: Window,
-}
-
-impl Pearl for MilkTeaWindow {}
-
 impl MilkTeaWindow {
-    pub fn window(&self) -> &Window {
-        &self.window
+    pub fn new(config: WindowConfig) -> Self {
+        Self {
+            init_config: config,
+            window: None,
+        }
+    }
+
+    pub fn window(&self) -> Option<&Window> {
+        self.window.as_ref()
     }
 }
