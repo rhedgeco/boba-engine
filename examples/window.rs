@@ -6,15 +6,11 @@ fn main() {
 
     milk_tea
         .world
-        .insert(MilkTeaWindow::<TestRenderer>::new(WindowConfig {
-            title: format!("Boba Engine"),
-        }));
+        .insert(MilkTeaWindow::<TestRenderer>::new(WindowConfig::default()));
 
     milk_tea
         .world
-        .insert(MilkTeaWindow::<TestRenderer>::new(WindowConfig {
-            title: format!("Boba Engine"),
-        }));
+        .insert(MilkTeaWindow::<TestRenderer>::new(WindowConfig::default()));
 
     milk_tea.run();
 }
@@ -22,6 +18,7 @@ fn main() {
 struct TestRenderer {
     window: Window,
 }
+
 impl WindowRenderer for TestRenderer {
     fn init(
         _: pearl::Handle<MilkTeaWindow<Self>>,
