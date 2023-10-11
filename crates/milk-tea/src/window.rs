@@ -1,31 +1,38 @@
-use boba_core::{EventListener, EventRegister, Pearl};
-use winit::window::Window;
+use boba_core::{pearl::Handle, BobaWorld, EventListener, EventRegister, Pearl};
+use winit::window::{Window, WindowId};
 
-use crate::events::MilkTeaUpdate;
+use crate::events::{MilkTeaUpdate, RedrawRequest};
+
+pub trait WindowRenderer: Sized + 'static {
+    fn init(handle: Handle<MilkTeaWindow<Self>>, window: Window) -> Self;
+    fn id(&self) -> WindowId;
+    fn render(&mut self, world: &BobaWorld);
+}
 
 pub struct WindowConfig {
     pub title: String,
 }
 
-pub struct MilkTeaWindow {
+pub struct MilkTeaWindow<R: WindowRenderer> {
     init_config: WindowConfig,
-    window: Option<Window>,
+    renderer: Option<R>,
 }
 
-impl Pearl for MilkTeaWindow {
+impl<R: WindowRenderer> Pearl for MilkTeaWindow<R> {
     fn register(register: &mut impl EventRegister<Self>) {
         register.event::<MilkTeaUpdate>();
+        register.event::<RedrawRequest>();
     }
 }
 
-impl EventListener<MilkTeaUpdate> for MilkTeaWindow {
+impl<R: WindowRenderer> EventListener<MilkTeaUpdate> for MilkTeaWindow<R> {
     fn update<'a>(
         event: &mut <MilkTeaUpdate as boba_core::Event>::Data<'a>,
         world: &mut boba_core::BobaWorld,
     ) {
         let mut remove_queue = Vec::new();
-        for mut window in world.iter::<MilkTeaWindow>().filter_map(|e| e.borrow_mut()) {
-            if window.window.is_some() {
+        for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
+            if window.renderer.is_some() {
                 continue;
             }
 
@@ -40,20 +47,33 @@ impl EventListener<MilkTeaUpdate> for MilkTeaWindow {
             };
 
             new_window.set_title(&window.init_config.title);
-            window.window = Some(new_window);
+            window.renderer = Some(R::init(window.handle(), new_window));
         }
     }
 }
 
-impl MilkTeaWindow {
+impl<R: WindowRenderer> EventListener<RedrawRequest> for MilkTeaWindow<R> {
+    fn update<'a>(
+        event: &mut <RedrawRequest as boba_core::Event>::Data<'a>,
+        world: &mut boba_core::BobaWorld,
+    ) {
+        for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
+            let Some(renderer) = &mut window.renderer else {
+                continue;
+            };
+
+            if renderer.id() == event.id() {
+                renderer.render(&world);
+            }
+        }
+    }
+}
+
+impl<R: WindowRenderer> MilkTeaWindow<R> {
     pub fn new(config: WindowConfig) -> Self {
         Self {
             init_config: config,
-            window: None,
+            renderer: None,
         }
-    }
-
-    pub fn window(&self) -> Option<&Window> {
-        self.window.as_ref()
     }
 }

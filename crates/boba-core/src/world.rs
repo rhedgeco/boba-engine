@@ -205,7 +205,7 @@ impl RunnerStore {
 
 #[derive(Default)]
 struct EventRegistry {
-    pearl_types: HashSet<PearlId>,
+    pearl_types: HashSet<(TypeId, PearlId)>,
     event_runners: IndexMap<TypeId, Vec<RunnerStore>>,
 }
 
@@ -226,7 +226,7 @@ impl<P: Pearl> EventRegister<P> for EventRegistry {
     where
         P: EventListener<E>,
     {
-        if self.pearl_types.insert(P::id()) {
+        if self.pearl_types.insert((TypeId::of::<E>(), P::id())) {
             self.insert_callback(P::update);
         }
     }

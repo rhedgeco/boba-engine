@@ -1,7 +1,7 @@
 use boba_core::BobaWorld;
 use winit::event_loop::EventLoop;
 
-use crate::events::{MilkTeaExit, MilkTeaStart, MilkTeaUpdate};
+use crate::events::{MilkTeaExit, MilkTeaStart, MilkTeaUpdate, RedrawRequest};
 
 pub struct MilkTeaSettings {
     pub close_when_no_windows: bool,
@@ -47,6 +47,7 @@ impl MilkTea {
                 }
                 _ => {}
             },
+            E::RedrawRequested(id) => self.world.trigger::<RedrawRequest>(&RedrawRequest::new(id)),
             E::MainEventsCleared => {
                 self.world
                     .trigger::<MilkTeaUpdate>(update.next_data(target, control));
