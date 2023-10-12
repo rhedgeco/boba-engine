@@ -1,4 +1,4 @@
-use crate::events::{CloseRequest, MilkTeaEvent, RedrawRequest, Resumed, Suspended, Update};
+use crate::events::{CloseRequest, RedrawRequest, Resume, Suspend, WindowInit};
 use boba_core::{BobaWorld, EventListener, EventRegister, Pearl};
 use winit::window::{Window, WindowId};
 
@@ -53,17 +53,14 @@ impl<M: WindowManager> WindowBuilder<M> {
 
 impl<M: WindowManager> Pearl for WindowBuilder<M> {
     fn register(register: &mut impl EventRegister<Self>) {
-        register.event::<MilkTeaEvent<Update>>();
+        register.event::<WindowInit>();
     }
 }
 
-impl<M: WindowManager> EventListener<MilkTeaEvent<Update>> for WindowBuilder<M> {
-    fn update<'a>(
-        event: &mut <MilkTeaEvent<Update> as boba_core::Event>::Data<'a>,
-        world: &mut BobaWorld,
-    ) {
+impl<M: WindowManager> EventListener<WindowInit> for WindowBuilder<M> {
+    fn update<'a>(event: &mut <WindowInit as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
         for builder in world.into_iter::<Self>() {
-            let window = match Window::new(event.window_target()) {
+            let window = match Window::new(event.target()) {
                 Ok(w) => w,
                 Err(e) => {
                     let title = builder.title;
@@ -108,18 +105,15 @@ impl<M: WindowManager> MilkTeaWindow<M> {
 
 impl<M: WindowManager> Pearl for MilkTeaWindow<M> {
     fn register(register: &mut impl EventRegister<Self>) {
-        register.event::<MilkTeaEvent<CloseRequest>>();
-        register.event::<MilkTeaEvent<RedrawRequest>>();
-        register.event::<MilkTeaEvent<Suspended>>();
-        register.event::<MilkTeaEvent<Resumed>>();
+        register.event::<CloseRequest>();
+        register.event::<RedrawRequest>();
+        register.event::<Suspend>();
+        register.event::<Resume>();
     }
 }
 
-impl<M: WindowManager> EventListener<MilkTeaEvent<CloseRequest>> for MilkTeaWindow<M> {
-    fn update<'a>(
-        event: &mut <MilkTeaEvent<CloseRequest> as boba_core::Event>::Data<'a>,
-        world: &mut BobaWorld,
-    ) {
+impl<M: WindowManager> EventListener<CloseRequest> for MilkTeaWindow<M> {
+    fn update<'a>(event: &mut <CloseRequest as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
         let Some(window) = world.get_where::<Self>(|p| p.id() == event.id()) else {
             return;
         };
@@ -132,9 +126,9 @@ impl<M: WindowManager> EventListener<MilkTeaEvent<CloseRequest>> for MilkTeaWind
     }
 }
 
-impl<M: WindowManager> EventListener<MilkTeaEvent<RedrawRequest>> for MilkTeaWindow<M> {
+impl<M: WindowManager> EventListener<RedrawRequest> for MilkTeaWindow<M> {
     fn update<'a>(
-        event: &mut <MilkTeaEvent<RedrawRequest> as boba_core::Event>::Data<'a>,
+        event: &mut <RedrawRequest as boba_core::Event>::Data<'a>,
         world: &mut BobaWorld,
     ) {
         world
@@ -143,22 +137,16 @@ impl<M: WindowManager> EventListener<MilkTeaEvent<RedrawRequest>> for MilkTeaWin
     }
 }
 
-impl<M: WindowManager> EventListener<MilkTeaEvent<Suspended>> for MilkTeaWindow<M> {
-    fn update<'a>(
-        _: &mut <MilkTeaEvent<Suspended> as boba_core::Event>::Data<'a>,
-        world: &mut BobaWorld,
-    ) {
+impl<M: WindowManager> EventListener<Suspend> for MilkTeaWindow<M> {
+    fn update<'a>(_: &mut <Suspend as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
         for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
             window.manager.suspend();
         }
     }
 }
 
-impl<M: WindowManager> EventListener<MilkTeaEvent<Resumed>> for MilkTeaWindow<M> {
-    fn update<'a>(
-        _: &mut <MilkTeaEvent<Resumed> as boba_core::Event>::Data<'a>,
-        world: &mut BobaWorld,
-    ) {
+impl<M: WindowManager> EventListener<Resume> for MilkTeaWindow<M> {
+    fn update<'a>(_: &mut <Resume as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
         for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
             window.manager.resume();
         }

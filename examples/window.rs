@@ -1,5 +1,4 @@
 use boba_engine::prelude::*;
-use milk_tea::events::MilkTeaEvent;
 
 fn main() {
     env_logger::init();
@@ -13,13 +12,12 @@ fn main() {
         TaroRenderConfig::default(),
     ));
 
-    milk_tea
-        .world
-        .insert_callback::<MilkTeaEvent<Update>>(|event, world| {
-            if world.len::<MilkTeaWindow<TaroRenderer>>() == 0 {
-                event.control_flow_mut().set_exit();
-            }
-        });
+    milk_tea.world.insert_callback::<MilkTeaUpdate>(|_, world| {
+        if world.len::<MilkTeaWindow<TaroRenderer>>() == 0 {
+            let mut control = world.get_static_mut::<ControlFlow>().unwrap();
+            control.set_exit(true);
+        }
+    });
 
     milk_tea.run();
 }
