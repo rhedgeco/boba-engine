@@ -9,5 +9,5 @@ pub mod prelude {
         window::{MilkTeaWindow, WindowBuilder, WindowManager},
         MilkTea,
     };
-    pub use taro_renderer::{TaroRenderConfig, TaroRenderer};
+    pub use taro_renderer::{pearls::TaroSkybox, TaroRenderConfig, TaroRenderer};
 }

@@ -109,7 +109,6 @@ impl WindowManager for TaroRenderer {
     }
 
     fn render(&mut self, world: &BobaWorld) {
-        log::info!("Rendering window {:?} with TaroRenderer", self.window.id());
         let Some(hardware) = HARDWARE.get() else {
             log::error!("Cannot render. TaroHardware is not initialized.");
             return;
@@ -134,8 +133,9 @@ impl WindowManager for TaroRenderer {
             }
         };
 
+        let mut command_buffers = Vec::new();
         if let Some(Some(mut camera)) = self.camera.map(|h| world.get_mut(h)) {
-            camera.render(hardware, &output.texture, world);
+            command_buffers.push(camera.render(hardware, &output.texture, world));
         } else {
             let view = output
                 .texture
@@ -149,9 +149,10 @@ impl WindowManager for TaroRenderer {
                     });
 
             BlackRenderPass::render(&mut encoder, &view);
-            hardware.queue.submit(core::iter::once(encoder.finish()));
+            command_buffers.push(encoder.finish());
         }
 
+        hardware.queue.submit(command_buffers);
         output.present();
     }
 }
