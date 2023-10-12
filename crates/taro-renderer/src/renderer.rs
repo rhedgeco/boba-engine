@@ -98,9 +98,9 @@ impl WindowRenderer for TaroRenderer {
     }
 
     fn render(&mut self, world: &mut BobaWorld) {
-        println!("Rendering window {:?} with TaroRenderer", self.window.id());
+        log::info!("Rendering window {:?} with TaroRenderer", self.window.id());
         let Some(hardware) = HARDWARE.get() else {
-            eprintln!("Cannot render. TaroHardware is not initialized.");
+            log::error!("Cannot render. TaroHardware is not initialized.");
             return;
         };
 
@@ -115,7 +115,7 @@ impl WindowRenderer for TaroRenderer {
         let output = match self.surface.get_current_texture() {
             Ok(o) => o,
             Err(e) => {
-                eprintln!("Error getting current window surface: {e}");
+                log::error!("Error getting current window surface: {e}");
                 return;
             }
         };

@@ -74,7 +74,7 @@ impl<R: WindowRenderer> EventListener<MilkTeaUpdate> for WindowBuilder<R> {
                 Err(e) => {
                     let target = builder.target;
                     let title = builder.config.title;
-                    eprintln!("Failed to create window '{title}' [{target:?}]: {e}");
+                    log::error!("Failed to create window '{title}' [{target:?}]: {e}");
                     continue;
                 }
             };
@@ -152,10 +152,11 @@ impl<R: WindowRenderer> EventListener<RedrawRequest> for MilkTeaWindow<R> {
                 renderer
             }
             None => {
-                eprintln!(
+                log::error!(
                     "Tried to render window ['{}':{:?}], but it was in an invalid state. \
                     Did you remove it from the world while it was rendering?",
-                    window.config.title, window.id
+                    window.config.title,
+                    window.id
                 );
                 drop(window);
                 world.remove(handle);
@@ -170,7 +171,7 @@ impl<R: WindowRenderer> EventListener<RedrawRequest> for MilkTeaWindow<R> {
         let mut window = match world.get_mut(handle) {
             Some(window) => window,
             None => {
-                eprintln!(
+                log::warn!(
                     "A window was destroyed or its world handle was changed while rendering. \
                     It is advised that you do not remove a window while it is rendering."
                 );
