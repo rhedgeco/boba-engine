@@ -1,4 +1,5 @@
 use boba_engine::prelude::*;
+use milk_tea::events::MilkTeaEvent;
 
 fn main() {
     env_logger::init();
@@ -14,7 +15,7 @@ fn main() {
 
     milk_tea
         .world
-        .insert_callback::<MilkTeaUpdate>(|event, world| {
+        .insert_callback::<MilkTeaEvent<Update>>(|event, world| {
             if world.len::<MilkTeaWindow<TaroRenderer>>() == 0 {
                 event.control_flow_mut().set_exit();
             }

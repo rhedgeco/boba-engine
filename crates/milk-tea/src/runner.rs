@@ -2,7 +2,8 @@ use boba_core::BobaWorld;
 use winit::event_loop::EventLoop;
 
 use crate::events::{
-    CloseRequest, MilkTeaExit, MilkTeaStart, MilkTeaUpdate, RedrawRequest, Resumed, Suspended,
+    CloseRequest, Exit, MilkTeaEvent, MilkTeaTimer, RedrawRequest, Resumed, Start, Suspended,
+    Update,
 };
 
 pub struct MilkTeaSettings {
@@ -38,36 +39,53 @@ impl MilkTea {
 
     pub fn run(mut self) -> ! {
         let event_loop = EventLoop::new();
-        let mut update = MilkTeaUpdate::new();
+        let mut timer = MilkTeaTimer::new();
 
         use winit::event::Event as E;
-        event_loop.run(move |event, target, control| match event {
-            E::NewEvents(cause) => match cause {
-                winit::event::StartCause::Init => {
-                    let start_data = MilkTeaStart::create_data(target, control);
-                    self.world.trigger::<MilkTeaStart>(start_data);
-                }
-                _ => {}
-            },
-            E::WindowEvent { window_id, event } => {
-                use winit::event::WindowEvent as WE;
-                match event {
-                    WE::CloseRequested => {
+        event_loop.run(move |event, target, control| {
+            let mut instant = timer.instant(target, control);
+            match event {
+                E::NewEvents(cause) => match cause {
+                    winit::event::StartCause::Init => {
                         self.world
-                            .trigger::<CloseRequest>(&CloseRequest::new(window_id));
+                            .trigger::<MilkTeaEvent<Start>>(instant.build(Start));
                     }
                     _ => {}
+                },
+                E::WindowEvent { window_id, event } => {
+                    use winit::event::WindowEvent as WE;
+                    match event {
+                        WE::CloseRequested => {
+                            self.world.trigger::<MilkTeaEvent<CloseRequest>>(
+                                instant.build(CloseRequest::new(window_id)),
+                            );
+                        }
+                        _ => {}
+                    }
                 }
+                E::Resumed => {
+                    self.world
+                        .trigger::<MilkTeaEvent<Resumed>>(instant.build(Resumed));
+                }
+                E::Suspended => {
+                    self.world
+                        .trigger::<MilkTeaEvent<Suspended>>(instant.build(Suspended));
+                }
+                E::RedrawRequested(id) => {
+                    self.world.trigger::<MilkTeaEvent<RedrawRequest>>(
+                        instant.build(RedrawRequest::new(id)),
+                    );
+                }
+                E::MainEventsCleared => {
+                    self.world
+                        .trigger::<MilkTeaEvent<Update>>(instant.build(Update));
+                }
+                E::LoopDestroyed => {
+                    self.world
+                        .trigger::<MilkTeaEvent<Exit>>(instant.build(Exit));
+                }
+                _ => {}
             }
-            E::Resumed => self.world.trigger::<Resumed>(&Resumed::new()),
-            E::Suspended => self.world.trigger::<Suspended>(&Suspended::new()),
-            E::RedrawRequested(id) => self.world.trigger::<RedrawRequest>(&RedrawRequest::new(id)),
-            E::MainEventsCleared => {
-                self.world
-                    .trigger::<MilkTeaUpdate>(update.next_data(target, control));
-            }
-            E::LoopDestroyed => self.world.trigger::<MilkTeaExit>(()),
-            _ => {}
         });
     }
 }

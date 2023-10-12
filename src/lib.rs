@@ -4,7 +4,7 @@ pub use milk_tea;
 pub mod prelude {
     pub use crate::core::{pearl, BobaWorld, Event, EventListener, EventRegister, Pearl};
     pub use milk_tea::{
-        events::{MilkTeaExit, MilkTeaStart, MilkTeaUpdate, StartData, UpdateData},
+        events::{Exit, Start, Update},
         window::{MilkTeaWindow, WindowBuilder, WindowManager},
         MilkTea,
     };
