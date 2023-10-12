@@ -1,6 +1,7 @@
 use crate::{
     pearl::{
-        Handle, Iter, PearlEntry, PearlExt, PearlId, PearlMap, PearlMut, PearlRef, UntypedPearlMap,
+        Handle, IntoIter, Iter, PearlEntry, PearlExt, PearlId, PearlMap, PearlMut, PearlRef,
+        UntypedPearlMap,
     },
     Event, EventListener, EventRegister, Pearl,
 };
@@ -100,6 +101,14 @@ impl BobaWorld {
         global.borrow_mut()
     }
 
+    pub fn get_where<P: Pearl>(&self, f: impl Fn(&PearlRef<P>) -> bool) -> Option<PearlRef<P>> {
+        self.get_map()?.get_where(f)
+    }
+
+    pub fn get_mut_where<P: Pearl>(&self, f: impl Fn(&PearlMut<P>) -> bool) -> Option<PearlMut<P>> {
+        self.get_map()?.get_mut_where(f)
+    }
+
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
         let handle = self.get_or_create_map().insert(pearl);
         P::on_insert(handle, self);
@@ -123,6 +132,10 @@ impl BobaWorld {
         Some(pearl)
     }
 
+    pub fn remove_where<P: Pearl>(&mut self, f: impl Fn(&PearlRef<P>) -> bool) -> Option<P> {
+        self.get_map_mut()?.remove_where(f)
+    }
+
     pub fn remove_global<P: Pearl>(&mut self) -> Option<P> {
         let any = self.global_pearls.remove(&P::id())?;
         let pearl: GlobalEntry<P> = *any.downcast().expect("Internal Error: Faulty downcast");
@@ -139,6 +152,14 @@ impl BobaWorld {
                 empty.iter()
             }
         }
+    }
+
+    pub fn into_iter<P: Pearl>(&mut self) -> IntoIter<P> {
+        let Some(map) = self.get_map_mut::<P>() else {
+            return IntoIter::empty();
+        };
+
+        core::mem::replace(map, PearlMap::new()).into_iter()
     }
 
     pub fn trigger<'a, E: Event>(&mut self, mut event: E::Data<'a>) {

@@ -170,13 +170,39 @@ impl<P: Pearl> PearlMap<P> {
         self.pearls[index].borrow()
     }
 
+    pub fn get_where(&self, f: impl Fn(&PearlRef<P>) -> bool) -> Option<PearlRef<P>> {
+        for pearl in self.pearls.iter().filter_map(|e| e.borrow()) {
+            if f(&pearl) {
+                return Some(pearl);
+            }
+        }
+
+        None
+    }
+
     pub fn get_mut(&self, handle: Handle<P>) -> Option<PearlMut<P>> {
         let index = *self.links.get_data(handle.into_type())?;
         self.pearls[index].borrow_mut()
     }
 
+    pub fn get_mut_where(&self, f: impl Fn(&PearlMut<P>) -> bool) -> Option<PearlMut<P>> {
+        for pearl in self.pearls.iter().filter_map(|e| e.borrow_mut()) {
+            if f(&pearl) {
+                return Some(pearl);
+            }
+        }
+
+        None
+    }
+
     pub fn iter(&self) -> Iter<P> {
         self.pearls.iter()
+    }
+
+    pub fn into_iter(self) -> IntoIter<P> {
+        IntoIter {
+            iter: self.pearls.into_iter(),
+        }
     }
 
     pub fn insert(&mut self, pearl: P) -> Handle<P> {
@@ -187,6 +213,21 @@ impl<P: Pearl> PearlMap<P> {
 
     pub fn remove(&mut self, handle: Handle<P>) -> Option<P> {
         let index = self.links.remove(handle.into_type())?;
+        Some(self.remove_at_index(index))
+    }
+
+    pub fn remove_where(&mut self, f: impl Fn(&PearlRef<P>) -> bool) -> Option<P> {
+        let mut remove_index = None;
+        for (index, pearl) in self.pearls.iter().filter_map(|e| e.borrow()).enumerate() {
+            if f(&pearl) {
+                remove_index = Some(index);
+            }
+        }
+
+        Some(self.remove_at_index(remove_index?))
+    }
+
+    fn remove_at_index(&mut self, index: usize) -> P {
         let removed = self.pearls.swap_remove(index).pearl;
         if let Some(swapped) = self.pearls.get_mut(index) {
             self.links
@@ -194,7 +235,7 @@ impl<P: Pearl> PearlMap<P> {
                 .map(|i| *i = index);
         }
 
-        Some(removed.into_inner())
+        removed.into_inner()
     }
 }
 
@@ -235,5 +276,25 @@ impl<P: Pearl> UntypedPearlMap for PearlMap<P> {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+pub struct IntoIter<P: Pearl> {
+    iter: std::vec::IntoIter<PearlEntry<P>>,
+}
+
+impl<P: Pearl> IntoIter<P> {
+    pub fn empty() -> Self {
+        Self {
+            iter: Vec::new().into_iter(),
+        }
+    }
+}
+
+impl<P: Pearl> Iterator for IntoIter<P> {
+    type Item = P;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.iter.next()?.pearl.into_inner())
     }
 }
