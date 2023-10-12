@@ -1,5 +1,6 @@
 pub mod event;
 pub mod pearl;
+pub mod unique;
 pub mod world;
 
 pub use event::{Event, EventListener, EventRegister};

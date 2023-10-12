@@ -3,73 +3,16 @@ use crate::{
         Handle, IntoIter, Iter, PearlEntry, PearlExt, PearlId, PearlMap, PearlMut, PearlRef,
         UntypedPearlMap,
     },
+    unique::{UniqueMut, UniquePearlMap, UniqueRef},
     Event, EventListener, EventRegister, Pearl,
 };
 use indexmap::IndexMap;
-use std::{
-    any::{Any, TypeId},
-    cell::{Ref, RefCell, RefMut},
-    collections::HashSet,
-    ops::{Deref, DerefMut},
-};
-
-pub struct GlobalEntry<P: Pearl> {
-    pearl: RefCell<P>,
-}
-
-impl<P: Pearl> GlobalEntry<P> {
-    pub(crate) fn new(pearl: P) -> Self {
-        Self {
-            pearl: RefCell::new(pearl),
-        }
-    }
-}
-
-impl<P: Pearl> GlobalEntry<P> {
-    pub fn borrow(&self) -> Option<GlobalRef<P>> {
-        let pearl = self.pearl.try_borrow().ok()?;
-        Some(GlobalRef { pearl })
-    }
-
-    pub fn borrow_mut(&self) -> Option<GlobalMut<P>> {
-        let pearl = self.pearl.try_borrow_mut().ok()?;
-        Some(GlobalMut { pearl })
-    }
-}
-
-pub struct GlobalRef<'a, P: Pearl> {
-    pearl: Ref<'a, P>,
-}
-
-impl<'a, P: Pearl> Deref for GlobalRef<'a, P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        self.pearl.deref()
-    }
-}
-
-pub struct GlobalMut<'a, P: Pearl> {
-    pearl: RefMut<'a, P>,
-}
-
-impl<'a, P: Pearl> DerefMut for GlobalMut<'a, P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.pearl.deref_mut()
-    }
-}
-
-impl<'a, P: Pearl> Deref for GlobalMut<'a, P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        self.pearl.deref()
-    }
-}
+use std::{any::TypeId, collections::HashSet};
 
 #[derive(Default)]
 pub struct BobaWorld {
-    global_pearls: IndexMap<PearlId, Box<dyn Any>>,
+    static_pearls: UniquePearlMap,
+    global_pearls: UniquePearlMap,
     pearl_maps: IndexMap<PearlId, Box<dyn UntypedPearlMap>>,
     event_registry: EventRegistry,
 }
@@ -90,22 +33,24 @@ impl BobaWorld {
         self.get_map()?.get(handle)
     }
 
-    pub fn get_global<P: Pearl>(&self) -> Option<GlobalRef<P>> {
-        let any = self.global_pearls.get(&P::id())?;
-        let global = any.downcast_ref::<GlobalEntry<P>>();
-        let global = global.expect("Internal Error: Faulty downcast");
-        global.borrow()
+    pub fn get_global<P: Pearl>(&self) -> Option<UniqueRef<P>> {
+        self.global_pearls.get()
+    }
+
+    pub fn get_static<P: Pearl>(&self) -> Option<UniqueRef<P>> {
+        self.static_pearls.get()
     }
 
     pub fn get_mut<P: Pearl>(&self, handle: Handle<P>) -> Option<PearlMut<P>> {
         self.get_map()?.get_mut(handle)
     }
 
-    pub fn get_global_mut<P: Pearl>(&self) -> Option<GlobalMut<P>> {
-        let any = self.global_pearls.get(&P::id())?;
-        let global = any.downcast_ref::<GlobalEntry<P>>();
-        let global = global.expect("Internal Error: Faulty downcast");
-        global.borrow_mut()
+    pub fn get_global_mut<P: Pearl>(&self) -> Option<UniqueMut<P>> {
+        self.global_pearls.get_mut()
+    }
+
+    pub fn get_static_mut<P: Pearl>(&self) -> Option<UniqueMut<P>> {
+        self.static_pearls.get_mut()
     }
 
     pub fn get_where<P: Pearl>(&self, f: impl Fn(&PearlRef<P>) -> bool) -> Option<PearlRef<P>> {
@@ -123,10 +68,21 @@ impl BobaWorld {
     }
 
     pub fn insert_global<P: Pearl>(&mut self, pearl: P) -> Option<P> {
-        let global = Box::new(GlobalEntry::new(pearl));
-        let any = self.global_pearls.insert(P::id(), global);
+        let pearl = self.global_pearls.insert(pearl);
+        if pearl.is_none() {
+            P::register(&mut self.event_registry);
+        }
         P::on_insert_global(self);
-        *any?.downcast().expect("Internal Error: Faulty downcast")
+        pearl
+    }
+
+    pub fn insert_static<P: Pearl>(&mut self, pearl: P) -> Option<P> {
+        let pearl = self.static_pearls.insert(pearl);
+        if pearl.is_none() {
+            P::register(&mut self.event_registry);
+        }
+        P::on_insert_global(self);
+        pearl
     }
 
     pub fn insert_callback<E: Event>(&mut self, callback: EventRunner<E>) {
@@ -144,11 +100,11 @@ impl BobaWorld {
     }
 
     pub fn remove_global<P: Pearl>(&mut self) -> Option<P> {
-        let any = self.global_pearls.remove(&P::id())?;
-        let pearl: GlobalEntry<P> = *any.downcast().expect("Internal Error: Faulty downcast");
-        let mut pearl = pearl.pearl.into_inner();
-        pearl.on_remove_global(self);
-        Some(pearl)
+        let mut pearl = self.global_pearls.remove::<P>();
+        if let Some(pearl) = &mut pearl {
+            pearl.on_remove_global(self)
+        }
+        pearl
     }
 
     pub fn iter<P: Pearl>(&self) -> Iter<P> {
@@ -233,7 +189,7 @@ impl RunnerStore {
 
 #[derive(Default)]
 struct EventRegistry {
-    pearl_types: HashSet<(TypeId, PearlId)>,
+    event_pairs: HashSet<(TypeId, PearlId)>,
     event_runners: IndexMap<TypeId, Vec<RunnerStore>>,
 }
 
@@ -254,7 +210,7 @@ impl<P: Pearl> EventRegister<P> for EventRegistry {
     where
         P: EventListener<E>,
     {
-        if self.pearl_types.insert((TypeId::of::<E>(), P::id())) {
+        if self.event_pairs.insert((TypeId::of::<E>(), P::id())) {
             self.insert_callback(P::update);
         }
     }

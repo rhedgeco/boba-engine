@@ -16,6 +16,7 @@ pub trait Pearl: Sized + 'static {
     fn register(register: &mut impl EventRegister<Self>) {}
     fn on_insert(handle: Handle<Self>, world: &mut BobaWorld) {}
     fn on_insert_global(world: &mut BobaWorld) {}
+    fn on_insert_static(world: &mut BobaWorld) {}
     fn on_remove(&mut self, world: &mut BobaWorld) {}
     fn on_remove_global(&mut self, world: &mut BobaWorld) {}
 }
