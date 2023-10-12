@@ -79,6 +79,13 @@ impl BobaWorld {
         Self::default()
     }
 
+    pub fn len<P: Pearl>(&self) -> usize {
+        match self.get_map::<P>() {
+            Some(map) => map.len(),
+            None => 0,
+        }
+    }
+
     pub fn get<P: Pearl>(&self, handle: Handle<P>) -> Option<PearlRef<P>> {
         self.get_map()?.get(handle)
     }
