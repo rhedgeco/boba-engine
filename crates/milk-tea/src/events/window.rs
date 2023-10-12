@@ -36,3 +36,31 @@ impl CloseRequest {
         self.id
     }
 }
+
+pub struct Suspended {
+    _private: (),
+}
+
+impl Suspended {
+    pub(crate) fn new() -> Self {
+        Self { _private: () }
+    }
+}
+
+impl Event for Suspended {
+    type Data<'a> = &'a Self;
+}
+
+pub struct Resumed {
+    _private: (),
+}
+
+impl Resumed {
+    pub(crate) fn new() -> Self {
+        Self { _private: () }
+    }
+}
+
+impl Event for Resumed {
+    type Data<'a> = &'a Self;
+}

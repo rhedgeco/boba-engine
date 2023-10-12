@@ -37,6 +37,14 @@ impl WindowManager for TaroRenderer {
         &self.window
     }
 
+    fn suspend(&mut self) {
+        log::error!("Suspend is currently not implemented");
+    }
+
+    fn resume(&mut self) {
+        log::error!("Resume is currently not implemented");
+    }
+
     fn init(window: Window, config: Self::Config) -> Self {
         let surface = unsafe { INSTANCE.create_surface(&window) }.unwrap();
 
