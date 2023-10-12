@@ -1,4 +1,4 @@
-use crate::{event::EventRegister, BobaWorld};
+use crate::event::EventRegister;
 use handle_map::map::sparse::SparseHandleMap;
 use std::{
     any::{Any, TypeId},
@@ -14,11 +14,6 @@ pub type Iter<'a, P> = std::slice::Iter<'a, PearlEntry<P>>;
 #[allow(unused_variables)]
 pub trait Pearl: Sized + 'static {
     fn register(register: &mut impl EventRegister<Self>) {}
-    fn on_insert(handle: Handle<Self>, world: &mut BobaWorld) {}
-    fn on_insert_global(world: &mut BobaWorld) {}
-    fn on_insert_static(world: &mut BobaWorld) {}
-    fn on_remove(&mut self, world: &mut BobaWorld) {}
-    fn on_remove_global(&mut self, world: &mut BobaWorld) {}
 }
 
 /// Unique identifier that can only be created by a [`Pearl`] type.

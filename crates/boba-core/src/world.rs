@@ -62,9 +62,7 @@ impl BobaWorld {
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Handle<P> {
-        let handle = self.get_or_create_map().insert(pearl);
-        P::on_insert(handle, self);
-        handle
+        self.get_or_create_map().insert(pearl)
     }
 
     pub fn insert_global<P: Pearl>(&mut self, pearl: P) -> Option<P> {
@@ -72,7 +70,6 @@ impl BobaWorld {
         if pearl.is_none() {
             P::register(&mut self.event_registry);
         }
-        P::on_insert_global(self);
         pearl
     }
 
@@ -81,7 +78,6 @@ impl BobaWorld {
         if pearl.is_none() {
             P::register(&mut self.event_registry);
         }
-        P::on_insert_global(self);
         pearl
     }
 
@@ -90,9 +86,7 @@ impl BobaWorld {
     }
 
     pub fn remove<P: Pearl>(&mut self, handle: Handle<P>) -> Option<P> {
-        let mut pearl = self.get_map_mut()?.remove(handle)?;
-        pearl.on_remove(self);
-        Some(pearl)
+        self.get_map_mut()?.remove(handle)
     }
 
     pub fn remove_where<P: Pearl>(&mut self, f: impl Fn(&PearlRef<P>) -> bool) -> Option<P> {
@@ -100,11 +94,7 @@ impl BobaWorld {
     }
 
     pub fn remove_global<P: Pearl>(&mut self) -> Option<P> {
-        let mut pearl = self.global_pearls.remove::<P>();
-        if let Some(pearl) = &mut pearl {
-            pearl.on_remove_global(self)
-        }
-        pearl
+        self.global_pearls.remove::<P>()
     }
 
     pub fn iter<P: Pearl>(&self) -> Iter<P> {
