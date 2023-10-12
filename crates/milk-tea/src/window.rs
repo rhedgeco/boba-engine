@@ -10,6 +10,7 @@ use winit::window::{Window, WindowId};
 pub trait WindowRenderer: Sized + 'static {
     fn init(target: MilkTeaTarget, window: Window) -> Self;
     fn render(&mut self, world: &mut BobaWorld);
+    fn window(&self) -> &Window;
 }
 
 pub struct WindowConfig {

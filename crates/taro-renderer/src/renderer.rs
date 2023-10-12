@@ -30,6 +30,10 @@ pub struct TaroRenderer {
 }
 
 impl WindowRenderer for TaroRenderer {
+    fn window(&self) -> &Window {
+        &self.window
+    }
+
     fn init(target: MilkTeaTarget, window: Window) -> Self {
         let surface = unsafe { INSTANCE.create_surface(&window) }.unwrap();
 
