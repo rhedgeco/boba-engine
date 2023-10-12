@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 winit = "0.28"
 indexmap = "2.0"
+thiserror = "1.0"
 boba-core = { path = "../boba-core" }

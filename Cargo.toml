@@ -7,8 +7,10 @@ edition = "2021"
 members = ["crates/*"]
 
 [dependencies]
+env_logger = "0.10"
 milk-tea = { path = "./crates/milk-tea" }
 boba-core = { path = "./crates/boba-core" }
+taro-renderer = { path = "./crates/taro-renderer" }
 
 [profile.release]
 debug = true

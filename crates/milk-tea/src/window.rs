@@ -1,12 +1,15 @@
-use boba_core::{pearl::Handle, BobaWorld, EventListener, EventRegister, Pearl};
+use crate::events::{CloseRequest, MilkTeaUpdate, RedrawRequest};
+use boba_core::{BobaWorld, EventListener, EventRegister, Pearl};
+use std::{
+    marker::PhantomData,
+    sync::atomic::{AtomicU64, Ordering},
+};
+use thiserror::Error;
 use winit::window::{Window, WindowId};
 
-use crate::events::{CloseRequest, MilkTeaUpdate, RedrawRequest};
-
 pub trait WindowRenderer: Sized + 'static {
-    fn init(handle: Handle<MilkTeaWindow<Self>>, window: Window) -> Self;
-    fn id(&self) -> WindowId;
-    fn render(&mut self, world: &BobaWorld);
+    fn init(target: MilkTeaTarget, window: Window) -> Self;
+    fn render(&mut self, world: &mut BobaWorld);
 }
 
 pub struct WindowConfig {
@@ -23,45 +26,116 @@ impl Default for WindowConfig {
     }
 }
 
-pub struct MilkTeaWindow<R: WindowRenderer> {
-    init_config: WindowConfig,
-    renderer: Option<R>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MilkTeaTarget {
+    id: u64,
 }
 
-impl<R: WindowRenderer> Pearl for MilkTeaWindow<R> {
-    fn register(register: &mut impl EventRegister<Self>) {
-        register.event::<MilkTeaUpdate>();
-        register.event::<RedrawRequest>();
-        register.event::<CloseRequest>();
+impl MilkTeaTarget {
+    fn new() -> Self {
+        static ID: AtomicU64 = AtomicU64::new(0);
+        Self {
+            id: ID.fetch_add(1, Ordering::Relaxed),
+        }
     }
 }
 
-impl<R: WindowRenderer> EventListener<MilkTeaUpdate> for MilkTeaWindow<R> {
+pub struct WindowBuilder<R: WindowRenderer> {
+    target: MilkTeaTarget,
+    config: WindowConfig,
+    _marker: PhantomData<*const R>,
+}
+
+impl<R: WindowRenderer> Pearl for WindowBuilder<R> {
+    fn register(register: &mut impl EventRegister<Self>) {
+        register.event::<MilkTeaUpdate>();
+    }
+}
+
+impl<R: WindowRenderer> WindowBuilder<R> {
+    pub fn new(config: WindowConfig) -> Self {
+        Self {
+            target: MilkTeaTarget::new(),
+            config,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<R: WindowRenderer> EventListener<MilkTeaUpdate> for WindowBuilder<R> {
     fn update<'a>(
         event: &mut <MilkTeaUpdate as boba_core::Event>::Data<'a>,
-        world: &mut boba_core::BobaWorld,
+        world: &mut BobaWorld,
     ) {
-        let mut remove_queue = Vec::new();
-        for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
-            if window.renderer.is_some() {
-                continue;
-            }
-
-            let new_window = match Window::new(event.window_target()) {
-                Ok(window) => window,
+        for builder in world.into_iter::<Self>() {
+            let window = match Window::new(event.window_target()) {
+                Ok(w) => w,
                 Err(e) => {
-                    remove_queue.push(window.handle());
-                    let title = &window.init_config.title;
-                    eprintln!("Failed to create window '{title}': {e}");
+                    let target = builder.target;
+                    let title = builder.config.title;
+                    eprintln!("Failed to create window '{title}' [{target:?}]: {e}");
                     continue;
                 }
             };
 
-            new_window.set_title(&window.init_config.title);
-            window.renderer = Some(R::init(window.handle(), new_window));
-        }
+            window.set_title(&builder.config.title);
+            let window = MilkTeaWindow {
+                id: window.id(),
+                target: builder.target,
+                config: builder.config,
+                renderer: Some(R::init(builder.target, window)),
+            };
 
-        for handle in remove_queue {
+            world.insert(window);
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Cannot access renderer while it is currently rendering.")]
+pub struct CurrentlyRendering;
+
+pub struct MilkTeaWindow<R: WindowRenderer> {
+    id: WindowId,
+    target: MilkTeaTarget,
+    config: WindowConfig,
+    renderer: Option<R>,
+}
+
+impl<R: WindowRenderer> MilkTeaWindow<R> {
+    pub fn id(&self) -> WindowId {
+        self.id
+    }
+
+    pub fn target(&self) -> MilkTeaTarget {
+        self.target
+    }
+
+    pub fn renderer(&self) -> Result<&R, CurrentlyRendering> {
+        self.renderer.as_ref().ok_or(CurrentlyRendering)
+    }
+
+    pub fn renderer_mut(&mut self) -> Result<&mut R, CurrentlyRendering> {
+        self.renderer.as_mut().ok_or(CurrentlyRendering)
+    }
+}
+
+impl<R: WindowRenderer> Pearl for MilkTeaWindow<R> {
+    fn register(register: &mut impl EventRegister<Self>) {
+        register.event::<CloseRequest>();
+        register.event::<RedrawRequest>();
+    }
+}
+
+impl<R: WindowRenderer> EventListener<CloseRequest> for MilkTeaWindow<R> {
+    fn update<'a>(event: &mut <CloseRequest as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
+        let Some(window) = world.get_where::<Self>(|p| p.id() == event.id()) else {
+            return;
+        };
+
+        if window.config.exit_on_close {
+            let handle = window.handle();
+            drop(window);
             world.remove(handle);
         }
     }
@@ -70,50 +144,53 @@ impl<R: WindowRenderer> EventListener<MilkTeaUpdate> for MilkTeaWindow<R> {
 impl<R: WindowRenderer> EventListener<RedrawRequest> for MilkTeaWindow<R> {
     fn update<'a>(
         event: &mut <RedrawRequest as boba_core::Event>::Data<'a>,
-        world: &mut boba_core::BobaWorld,
+        world: &mut BobaWorld,
     ) {
-        for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
-            let Some(renderer) = &mut window.renderer else {
-                continue;
-            };
+        // access the window associated with the requested id
+        let Some(mut window) = world.get_mut_where::<Self>(|p| p.id() == event.id()) else {
+            return;
+        };
 
-            if renderer.id() == event.id() {
-                renderer.render(&world);
+        // take the renderer out so that the world may still be used mutably
+        let handle = window.handle();
+        let mut renderer = match window.renderer.take() {
+            Some(renderer) => {
+                drop(window);
+                renderer
             }
-        }
-    }
-}
-
-impl<R: WindowRenderer> EventListener<CloseRequest> for MilkTeaWindow<R> {
-    fn update<'a>(event: &mut <CloseRequest as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
-        let mut handle = None;
-        for window in world.iter::<Self>().filter_map(|e| e.borrow()) {
-            let Some(renderer) = &window.renderer else {
-                continue;
-            };
-
-            if renderer.id() != event.id() {
-                continue;
+            None => {
+                eprintln!(
+                    "Tried to render window ['{}':{:?}], but it was in an invalid state. \
+                    Did you remove it from the world while it was rendering?",
+                    window.config.title, window.id
+                );
+                drop(window);
+                world.remove(handle);
+                return;
             }
+        };
 
-            if !window.init_config.exit_on_close {
-                break;
+        // render the world in its current state
+        renderer.render(world);
+
+        // print error if the target window was moved or destroyed while it was rendering
+        let mut window = match world.get_mut(handle) {
+            Some(window) => window,
+            None => {
+                eprintln!(
+                    "A window was destroyed or its world handle was changed while rendering. \
+                    It is advised that you do not remove a window while it is rendering."
+                );
+
+                // try to recover the original window if it was moved and now has a new handle
+                match world.get_mut_where::<Self>(|p| p.id() == event.id()) {
+                    Some(window) => window,
+                    None => return,
+                }
             }
+        };
 
-            handle = Some(window.handle());
-        }
-
-        if let Some(handle) = handle {
-            world.remove(handle);
-        }
-    }
-}
-
-impl<R: WindowRenderer> MilkTeaWindow<R> {
-    pub fn new(config: WindowConfig) -> Self {
-        Self {
-            init_config: config,
-            renderer: None,
-        }
+        // return the renderer to its rightful place
+        window.renderer = Some(renderer);
     }
 }

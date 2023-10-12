@@ -5,7 +5,8 @@ pub mod prelude {
     pub use crate::core::{pearl, BobaWorld, Event, EventListener, EventRegister, Pearl};
     pub use milk_tea::{
         events::{MilkTeaExit, MilkTeaStart, MilkTeaUpdate, StartData, UpdateData},
-        window::{MilkTeaWindow, WindowConfig},
+        window::{MilkTeaWindow, WindowBuilder, WindowConfig},
         MilkTea,
     };
+    pub use taro_renderer::TaroRenderer;
 }
