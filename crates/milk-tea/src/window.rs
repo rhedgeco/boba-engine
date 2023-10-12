@@ -1,6 +1,5 @@
 use crate::events::{CloseRequest, MilkTeaEvent, RedrawRequest, Resumed, Suspended, Update};
 use boba_core::{BobaWorld, EventListener, EventRegister, Pearl};
-use thiserror::Error;
 use winit::window::{Window, WindowId};
 
 pub trait WindowManager: 'static {
@@ -85,10 +84,6 @@ impl<M: WindowManager> EventListener<MilkTeaEvent<Update>> for WindowBuilder<M> 
         }
     }
 }
-
-#[derive(Debug, Error)]
-#[error("Cannot access renderer while it is currently rendering.")]
-pub struct CurrentlyRendering;
 
 pub struct MilkTeaWindow<M: WindowManager> {
     id: WindowId,
