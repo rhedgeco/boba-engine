@@ -110,14 +110,6 @@ impl<R: WindowRenderer> MilkTeaWindow<R> {
     pub fn target(&self) -> MilkTeaTarget {
         self.target
     }
-
-    pub fn renderer(&self) -> Result<&R, CurrentlyRendering> {
-        self.renderer.as_ref().ok_or(CurrentlyRendering)
-    }
-
-    pub fn renderer_mut(&mut self) -> Result<&mut R, CurrentlyRendering> {
-        self.renderer.as_mut().ok_or(CurrentlyRendering)
-    }
 }
 
 impl<R: WindowRenderer> Pearl for MilkTeaWindow<R> {
