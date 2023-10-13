@@ -7,18 +7,18 @@ fn main() {
     // insert a global skybox as light blue
     milk_tea
         .world
-        .insert_global(TaroSkybox::Color(Color::LIGHT_BLUE));
+        .insert_global(TaroSkybox::Color(Colorf64::LIGHT_BLUE));
 
     // create 3 cameras
     // first with the default "global" skybox
     let camera1 = milk_tea.world.insert(TaroCamera::default());
     // next with an overidden local skybox set to salmon
     let camera2 = milk_tea.world.insert(TaroCamera {
-        skybox: CameraSkybox::Local(TaroSkybox::Color(Color::LIGHT_SALMON)),
+        skybox: CameraSkybox::Local(TaroSkybox::Color(Colorf64::LIGHT_SALMON)),
     });
     // last with an overidden local skybox set to green
     let camera3 = milk_tea.world.insert(TaroCamera {
-        skybox: CameraSkybox::Local(TaroSkybox::Color(Color::LIGHT_GREEN)),
+        skybox: CameraSkybox::Local(TaroSkybox::Color(Colorf64::LIGHT_GREEN)),
     });
 
     // create and insert 3 window builders connected to each camera

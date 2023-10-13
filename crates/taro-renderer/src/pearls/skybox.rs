@@ -1,10 +1,10 @@
 use boba_core::Pearl;
 use wgpu::{CommandEncoder, TextureView};
 
-use crate::data::Color;
+use crate::data::Colorf64;
 
 pub enum TaroSkybox {
-    Color(Color),
+    Color(Colorf64),
 }
 
 impl Pearl for TaroSkybox {}
