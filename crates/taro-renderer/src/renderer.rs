@@ -1,6 +1,9 @@
 use crate::{passes::BlackRenderPass, TaroCamera};
 use boba_core::{pearl::Handle, BobaWorld};
-use milk_tea::{window::WindowManager, winit::window::Window};
+use milk_tea::{
+    window::{RenderBuilder, RenderManager},
+    winit::window::{Window, WindowId},
+};
 use once_cell::sync::{Lazy, OnceCell};
 use wgpu::{Adapter, Device, Instance, Queue, Surface, SurfaceConfiguration};
 
@@ -11,43 +14,24 @@ pub struct TaroHardware {
 }
 
 static HARDWARE: OnceCell<TaroHardware> = OnceCell::new();
-static INSTANCE: Lazy<Instance> = Lazy::new(|| {
-    Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::all(),
-        dx12_shader_compiler: Default::default(),
-    })
-});
 
 #[derive(Default)]
-pub struct TaroRenderConfig {
+pub struct TaroRenderBuilder {
     pub render_cam: Option<Handle<TaroCamera>>,
 }
 
-pub struct TaroRenderer {
-    window: Window,
-    surface: Surface,
-    surface_config: SurfaceConfiguration,
-    camera: Option<Handle<TaroCamera>>,
-}
+impl RenderBuilder for TaroRenderBuilder {
+    type Renderer = TaroRenderer;
 
-impl WindowManager for TaroRenderer {
-    type Config = TaroRenderConfig;
+    fn build(self, window: Window) -> Self::Renderer {
+        static INSTANCE: Lazy<Instance> = Lazy::new(|| {
+            Instance::new(wgpu::InstanceDescriptor {
+                backends: wgpu::Backends::all(),
+                dx12_shader_compiler: Default::default(),
+            })
+        });
 
-    fn window(&self) -> &Window {
-        &self.window
-    }
-
-    fn suspend(&mut self) {
-        log::error!("Suspend is currently not implemented");
-    }
-
-    fn resume(&mut self) {
-        log::error!("Resume is currently not implemented");
-    }
-
-    fn init(window: Window, config: Self::Config) -> Self {
         let surface = unsafe { INSTANCE.create_surface(&window) }.unwrap();
-
         let hardware = HARDWARE.get_or_init(|| {
             let adapter =
                 pollster::block_on(INSTANCE.request_adapter(&wgpu::RequestAdapterOptions {
@@ -56,7 +40,6 @@ impl WindowManager for TaroRenderer {
                     force_fallback_adapter: false,
                 }))
                 .unwrap();
-
             let (device, queue) = pollster::block_on(adapter.request_device(
                 &wgpu::DeviceDescriptor {
                     features: wgpu::Features::empty(),
@@ -72,14 +55,12 @@ impl WindowManager for TaroRenderer {
                 None,
             ))
             .unwrap();
-
             TaroHardware {
                 adapter,
                 device,
                 queue,
             }
         });
-
         let size = window.inner_size();
         let surface_caps = surface.get_capabilities(&hardware.adapter);
         let surface_format = surface_caps
@@ -88,7 +69,6 @@ impl WindowManager for TaroRenderer {
             .copied()
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
-
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -99,13 +79,33 @@ impl WindowManager for TaroRenderer {
             view_formats: vec![],
         };
         surface.configure(&hardware.device, &surface_config);
-
-        Self {
+        Self::Renderer {
             window,
             surface,
             surface_config,
-            camera: config.render_cam,
+            camera: self.render_cam,
         }
+    }
+}
+
+pub struct TaroRenderer {
+    window: Window,
+    surface: Surface,
+    surface_config: SurfaceConfiguration,
+    camera: Option<Handle<TaroCamera>>,
+}
+
+impl RenderManager for TaroRenderer {
+    fn window_id(&self) -> WindowId {
+        self.window.id()
+    }
+
+    fn suspend(&mut self) {
+        log::error!("Suspend is currently not implemented");
+    }
+
+    fn resume(&mut self) {
+        log::error!("Resume is currently not implemented");
     }
 
     fn render(&mut self, world: &BobaWorld) {

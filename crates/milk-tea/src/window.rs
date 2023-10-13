@@ -1,29 +1,54 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::events::{CloseRequest, RedrawRequest, Resume, Suspend, WindowInit};
 use boba_core::{BobaWorld, EventListener, EventRegister, Pearl};
 use winit::window::{Window, WindowId};
 
-pub trait WindowManager: 'static {
-    type Config;
-    fn init(window: Window, config: Self::Config) -> Self;
+pub trait RenderBuilder: 'static {
+    type Renderer: RenderManager;
+    fn build(self, window: Window) -> Self::Renderer;
+}
+
+pub trait RenderManager: 'static {
     fn render(&mut self, world: &BobaWorld);
-    fn window(&self) -> &Window;
+    fn window_id(&self) -> WindowId;
     fn suspend(&mut self);
     fn resume(&mut self);
 }
 
-pub struct WindowBuilder<M: WindowManager> {
-    pub title: String,
-    pub exit_on_close: bool,
-    pub config: M::Config,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MilkTeaId {
+    value: u64,
 }
 
-impl<M: WindowManager> WindowBuilder<M> {
-    pub fn new(config: M::Config) -> Self {
+impl MilkTeaId {
+    pub(crate) fn new() -> Self {
+        static IDGEN: AtomicU64 = AtomicU64::new(0);
         Self {
+            value: IDGEN.fetch_add(1, Ordering::Relaxed),
+        }
+    }
+}
+
+pub struct WindowBuilder<M: RenderBuilder> {
+    id: MilkTeaId,
+    title: String,
+    exit_on_close: bool,
+    render_builder: M,
+}
+
+impl<M: RenderBuilder> WindowBuilder<M> {
+    pub fn new(render_builder: M) -> Self {
+        Self {
+            id: MilkTeaId::new(),
             title: format!("Milk Tea"),
             exit_on_close: true,
-            config,
+            render_builder,
         }
+    }
+
+    pub fn id(&self) -> MilkTeaId {
+        self.id
     }
 
     pub fn title(&self) -> &str {
@@ -42,22 +67,22 @@ impl<M: WindowManager> WindowBuilder<M> {
         self.exit_on_close = exit;
     }
 
-    pub fn config(&self) -> &M::Config {
-        &self.config
+    pub fn render_builder(&self) -> &M {
+        &self.render_builder
     }
 
-    pub fn config_mut(&mut self) -> &mut M::Config {
-        &mut self.config
+    pub fn render_builder_mut(&mut self) -> &mut M {
+        &mut self.render_builder
     }
 }
 
-impl<M: WindowManager> Pearl for WindowBuilder<M> {
+impl<M: RenderBuilder> Pearl for WindowBuilder<M> {
     fn register(register: &mut impl EventRegister<Self>) {
         register.event::<WindowInit>();
     }
 }
 
-impl<M: WindowManager> EventListener<WindowInit> for WindowBuilder<M> {
+impl<M: RenderBuilder> EventListener<WindowInit> for WindowBuilder<M> {
     fn update<'a>(event: &mut <WindowInit as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
         for builder in world.into_iter::<Self>() {
             let window = match Window::new(event.target()) {
@@ -71,10 +96,11 @@ impl<M: WindowManager> EventListener<WindowInit> for WindowBuilder<M> {
 
             window.set_title(&builder.title);
             let window = MilkTeaWindow {
-                id: window.id(),
+                id: builder.id,
                 title: builder.title,
+                window_id: window.id(),
                 exit_on_close: builder.exit_on_close,
-                manager: M::init(window, builder.config),
+                manager: Box::new(builder.render_builder.build(window)),
             };
 
             world.insert(window);
@@ -82,28 +108,25 @@ impl<M: WindowManager> EventListener<WindowInit> for WindowBuilder<M> {
     }
 }
 
-pub struct MilkTeaWindow<M: WindowManager> {
-    id: WindowId,
+pub struct MilkTeaWindow {
+    id: MilkTeaId,
     title: String,
+    window_id: WindowId,
     exit_on_close: bool,
-    manager: M,
+    manager: Box<dyn RenderManager>,
 }
 
-impl<M: WindowManager> MilkTeaWindow<M> {
-    pub fn id(&self) -> WindowId {
+impl MilkTeaWindow {
+    pub fn id(&self) -> MilkTeaId {
         self.id
     }
 
     pub fn title(&self) -> &str {
         &self.title
     }
-
-    pub fn window(&self) -> &Window {
-        self.manager.window()
-    }
 }
 
-impl<M: WindowManager> Pearl for MilkTeaWindow<M> {
+impl Pearl for MilkTeaWindow {
     fn register(register: &mut impl EventRegister<Self>) {
         register.event::<CloseRequest>();
         register.event::<RedrawRequest>();
@@ -112,9 +135,9 @@ impl<M: WindowManager> Pearl for MilkTeaWindow<M> {
     }
 }
 
-impl<M: WindowManager> EventListener<CloseRequest> for MilkTeaWindow<M> {
+impl EventListener<CloseRequest> for MilkTeaWindow {
     fn update<'a>(event: &mut <CloseRequest as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
-        let Some(window) = world.get_where::<Self>(|p| p.id() == event.id()) else {
+        let Some(window) = world.get_where::<Self>(|p| p.window_id == event.id()) else {
             return;
         };
 
@@ -126,18 +149,18 @@ impl<M: WindowManager> EventListener<CloseRequest> for MilkTeaWindow<M> {
     }
 }
 
-impl<M: WindowManager> EventListener<RedrawRequest> for MilkTeaWindow<M> {
+impl EventListener<RedrawRequest> for MilkTeaWindow {
     fn update<'a>(
         event: &mut <RedrawRequest as boba_core::Event>::Data<'a>,
         world: &mut BobaWorld,
     ) {
         world
-            .get_mut_where::<Self>(|p| p.id() == event.id())
+            .get_mut_where::<Self>(|p| p.window_id == event.id())
             .map(|mut w| w.manager.render(world));
     }
 }
 
-impl<M: WindowManager> EventListener<Suspend> for MilkTeaWindow<M> {
+impl EventListener<Suspend> for MilkTeaWindow {
     fn update<'a>(_: &mut <Suspend as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
         for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
             window.manager.suspend();
@@ -145,7 +168,7 @@ impl<M: WindowManager> EventListener<Suspend> for MilkTeaWindow<M> {
     }
 }
 
-impl<M: WindowManager> EventListener<Resume> for MilkTeaWindow<M> {
+impl EventListener<Resume> for MilkTeaWindow {
     fn update<'a>(_: &mut <Resume as boba_core::Event>::Data<'a>, world: &mut BobaWorld) {
         for mut window in world.iter::<Self>().filter_map(|e| e.borrow_mut()) {
             window.manager.resume();

@@ -6,8 +6,8 @@ pub mod prelude {
     pub use milk_tea::{
         events::{MilkTeaExit, MilkTeaStart, MilkTeaUpdate},
         pearls::{ControlFlow, Time},
-        window::{MilkTeaWindow, WindowBuilder, WindowManager},
+        window::{MilkTeaWindow, RenderManager, WindowBuilder},
         MilkTea,
     };
-    pub use taro_renderer::{pearls::TaroSkybox, TaroRenderConfig, TaroRenderer};
+    pub use taro_renderer::{pearls::TaroSkybox, TaroRenderBuilder, TaroRenderer};
 }
