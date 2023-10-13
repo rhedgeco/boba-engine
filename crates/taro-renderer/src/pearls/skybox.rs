@@ -1,8 +1,10 @@
 use boba_core::Pearl;
 use wgpu::{CommandEncoder, TextureView};
 
+use crate::data::Color;
+
 pub enum TaroSkybox {
-    Color { r: f64, g: f64, b: f64, a: f64 },
+    Color(Color),
 }
 
 impl Pearl for TaroSkybox {}
@@ -10,7 +12,7 @@ impl Pearl for TaroSkybox {}
 impl TaroSkybox {
     pub(crate) fn render(&self, encoder: &mut CommandEncoder, view: &TextureView) {
         match self {
-            Self::Color { r, g, b, a } => {
+            Self::Color(color) => {
                 encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Blank Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -18,10 +20,10 @@ impl TaroSkybox {
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: *r,
-                                g: *g,
-                                b: *b,
-                                a: *a,
+                                r: color.r,
+                                g: color.g,
+                                b: color.b,
+                                a: color.a,
                             }),
                             store: true,
                         },

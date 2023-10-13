@@ -3,17 +3,21 @@ use wgpu::{CommandBuffer, Texture};
 
 use crate::{passes::BlackRenderPass, pearls::TaroSkybox, TaroHardware};
 
+#[derive(Default)]
+pub enum CameraSkybox {
+    #[default]
+    Global,
+    Local(TaroSkybox),
+}
+
+#[derive(Default)]
 pub struct TaroCamera {
-    _private: (),
+    pub skybox: CameraSkybox,
 }
 
 impl Pearl for TaroCamera {}
 
 impl TaroCamera {
-    pub fn new() -> Self {
-        Self { _private: () }
-    }
-
     pub fn render(
         &mut self,
         hardware: &TaroHardware,
@@ -29,10 +33,15 @@ impl TaroCamera {
                 label: Some("Taro Camera Encoder"),
             });
 
-        if let Some(skybox) = world.get_global::<TaroSkybox>() {
-            skybox.render(&mut encoder, &view);
-        } else {
-            BlackRenderPass::render(&mut encoder, &view);
+        match &self.skybox {
+            CameraSkybox::Local(skybox) => skybox.render(&mut encoder, &view),
+            CameraSkybox::Global => {
+                if let Some(skybox) = world.get_global::<TaroSkybox>() {
+                    skybox.render(&mut encoder, &view);
+                } else {
+                    BlackRenderPass::render(&mut encoder, &view);
+                }
+            }
         }
 
         encoder.finish()
