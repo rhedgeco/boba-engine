@@ -1,3 +1,3 @@
-mod black;
+mod color;
 
-pub use black::BlackRenderPass;
+pub use color::SolidColorRenderPass;

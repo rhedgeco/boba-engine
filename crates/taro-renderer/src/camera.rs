@@ -1,7 +1,7 @@
 use boba_core::{BobaWorld, Pearl};
 use wgpu::{CommandBuffer, Texture};
 
-use crate::{passes::BlackRenderPass, pearls::TaroSkybox, TaroHardware};
+use crate::{data::Colorf64, passes::SolidColorRenderPass, pearls::TaroSkybox, TaroHardware};
 
 #[derive(Default)]
 pub enum CameraSkybox {
@@ -39,7 +39,7 @@ impl TaroCamera {
                 if let Some(skybox) = world.get_global::<TaroSkybox>() {
                     skybox.render(&mut encoder, &view);
                 } else {
-                    BlackRenderPass::render(&mut encoder, &view);
+                    SolidColorRenderPass::render(&Colorf64::BLACK, &mut encoder, &view);
                 }
             }
         }

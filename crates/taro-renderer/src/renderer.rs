@@ -1,4 +1,4 @@
-use crate::{passes::BlackRenderPass, TaroCamera};
+use crate::{data::Colorf64, passes::SolidColorRenderPass, TaroCamera};
 use boba_core::{pearl::Handle, BobaWorld};
 use milk_tea::{
     window::{RenderBuilder, RenderManager},
@@ -148,7 +148,7 @@ impl RenderManager for TaroRenderer {
                         label: Some("Empty Encoder"),
                     });
 
-            BlackRenderPass::render(&mut encoder, &view);
+            SolidColorRenderPass::render(&Colorf64::BLACK, &mut encoder, &view);
             command_buffers.push(encoder.finish());
         }
 

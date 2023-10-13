@@ -1,9 +1,11 @@
 use wgpu::{CommandEncoder, TextureView};
 
-pub struct BlackRenderPass;
+use crate::data::Colorf64;
 
-impl BlackRenderPass {
-    pub fn render(encoder: &mut CommandEncoder, view: &TextureView) {
+pub struct SolidColorRenderPass;
+
+impl SolidColorRenderPass {
+    pub fn render(color: &Colorf64, encoder: &mut CommandEncoder, view: &TextureView) {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Blank Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -11,10 +13,10 @@ impl BlackRenderPass {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 1.0,
+                        r: color.r,
+                        g: color.g,
+                        b: color.b,
+                        a: color.a,
                     }),
                     store: true,
                 },
