@@ -39,7 +39,7 @@ impl UpdateEvent {
 
 fn main() {
     let mut world = World::new();
-    world.insert(FpsPearl);
+    world.insert_pearl(FpsPearl);
 
     let mut update = UpdateEvent::default();
     loop {

@@ -74,6 +74,7 @@ pub struct World {
     types: HashMap<TypeId, Handle<Box<dyn Any>>>,
     pearls: DenseHandleMap<Box<dyn Any>>,
     events: HashMap<TypeId, Box<dyn Any>>,
+    resources: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl World {
@@ -81,16 +82,26 @@ impl World {
         Self::default()
     }
 
-    pub fn get<P: Pearl>(&self, link: Link<P>) -> Option<&P> {
+    pub fn pearl<P: Pearl>(&self, link: Link<P>) -> Option<&P> {
         let any = self.pearls.get_data(link.map_handle)?;
         let map = any.downcast_ref::<PearlMap<P>>().unwrap();
         map.get_data(link.pearl_handle)
     }
 
-    pub fn get_mut<P: Pearl>(&mut self, link: Link<P>) -> Option<&mut P> {
+    pub fn pearl_mut<P: Pearl>(&mut self, link: Link<P>) -> Option<&mut P> {
         let any = self.pearls.get_data_mut(link.map_handle)?;
         let map = any.downcast_mut::<PearlMap<P>>().unwrap();
         map.get_data_mut(link.pearl_handle)
+    }
+
+    pub fn resource<R: 'static>(&self) -> Option<&R> {
+        let any = self.resources.get(&TypeId::of::<R>())?;
+        Some(any.downcast_ref::<R>().unwrap())
+    }
+
+    pub fn resource_mut<R: 'static>(&mut self) -> Option<&mut R> {
+        let any = self.resources.get_mut(&TypeId::of::<R>())?;
+        Some(any.downcast_mut::<R>().unwrap())
     }
 
     pub fn iter<P: Pearl>(&self) -> impl Iterator<Item = &P> {
@@ -113,7 +124,12 @@ impl World {
         map.iter_mut()
     }
 
-    pub fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
+    pub fn remove_resource<R: 'static>(&mut self) -> Option<R> {
+        let any = self.resources.remove(&TypeId::of::<R>())?;
+        Some(*any.downcast::<R>().unwrap())
+    }
+
+    pub fn remove_pearl<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
         let any = self.pearls.get_data_mut(link.map_handle)?;
         let map = any.downcast_mut::<PearlMap<P>>().unwrap();
         let mut pearl = map.remove(link.pearl_handle)?;
@@ -121,7 +137,21 @@ impl World {
         Some(pearl)
     }
 
-    pub fn insert<P: Pearl>(&mut self, pearl: P) -> Link<P> {
+    pub fn insert_resource<R: 'static>(&mut self, resource: R) -> Option<R> {
+        use hashbrown::hash_map::Entry as E;
+        match self.resources.entry(TypeId::of::<R>()) {
+            E::Vacant(e) => {
+                e.insert(Box::new(resource));
+                None
+            }
+            E::Occupied(e) => {
+                let (_, any) = e.replace_entry(Box::new(resource));
+                Some(*any.downcast::<R>().unwrap())
+            }
+        }
+    }
+
+    pub fn insert_pearl<P: Pearl>(&mut self, pearl: P) -> Link<P> {
         let pearl_id = TypeId::of::<P>();
         use hashbrown::hash_map::Entry as E;
         let map_handle = match self.types.entry(pearl_id) {
