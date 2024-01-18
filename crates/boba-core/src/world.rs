@@ -93,14 +93,6 @@ impl World {
         map.get_data_mut(link.pearl_handle)
     }
 
-    pub fn remove_pearl<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
-        let any = self.pearls.get_data_mut(link.map_handle)?;
-        let map = any.downcast_mut::<PearlMap<P>>().unwrap();
-        let mut pearl = map.remove(link.pearl_handle)?;
-        P::on_remove(Removed(&mut pearl), self);
-        Some(pearl)
-    }
-
     pub fn iter<P: Pearl>(&self) -> impl Iterator<Item = &P> {
         let Some(map_handle) = self.types.get(&TypeId::of::<P>()) else {
             return [].iter();
@@ -121,20 +113,12 @@ impl World {
         map.iter_mut()
     }
 
-    pub fn listen<E: Event>(&mut self, listener: EventListener<E>) {
-        use hashbrown::hash_map::Entry;
-        match self.events.entry(TypeId::of::<E>()) {
-            Entry::Occupied(e) => {
-                let any = e.into_mut();
-                let vec = any.downcast_mut::<Vec<EventListener<E>>>().unwrap();
-                vec.push(listener);
-            }
-            Entry::Vacant(e) => {
-                let mut vec = Vec::new();
-                vec.push(listener);
-                e.insert(Box::new(vec));
-            }
-        }
+    pub fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
+        let any = self.pearls.get_data_mut(link.map_handle)?;
+        let map = any.downcast_mut::<PearlMap<P>>().unwrap();
+        let mut pearl = map.remove(link.pearl_handle)?;
+        P::on_remove(Removed(&mut pearl), self);
+        Some(pearl)
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Link<P> {
@@ -160,6 +144,22 @@ impl World {
 
         P::on_insert(link, self);
         link
+    }
+
+    pub fn listen<E: Event>(&mut self, listener: EventListener<E>) {
+        use hashbrown::hash_map::Entry;
+        match self.events.entry(TypeId::of::<E>()) {
+            Entry::Occupied(e) => {
+                let any = e.into_mut();
+                let vec = any.downcast_mut::<Vec<EventListener<E>>>().unwrap();
+                vec.push(listener);
+            }
+            Entry::Vacant(e) => {
+                let mut vec = Vec::new();
+                vec.push(listener);
+                e.insert(Box::new(vec));
+            }
+        }
     }
 
     pub fn trigger<'a, E: Event>(&mut self, event: &mut E::Data<'a>) {
