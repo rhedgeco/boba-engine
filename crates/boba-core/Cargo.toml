@@ -6,5 +6,4 @@ edition = "2021"
 [dependencies]
 indexmap = "2.1"
 hashbrown = "0.14"
-node-tree = { path = "../node-tree" }
 handle-map = { path = "../handle-map" }

@@ -13,7 +13,7 @@ impl FpsPearl {
 
 impl Pearl for FpsPearl {
     fn init_type(world: &mut World) {
-        world.add_listener::<UpdateEvent>(|world, delta| {
+        world.listen::<UpdateEvent>(|world, delta| {
             for pearl in world.iter::<Self>() {
                 pearl.update(*delta);
             }
@@ -39,8 +39,7 @@ impl UpdateEvent {
 
 fn main() {
     let mut world = World::new();
-    let node = world.spawn();
-    world.add_pearl(node, FpsPearl).unwrap();
+    world.insert(FpsPearl);
 
     let mut update = UpdateEvent::default();
     loop {

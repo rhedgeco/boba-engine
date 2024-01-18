@@ -6,7 +6,6 @@ use std::{
 
 use handle_map::{map::DenseHandleMap, Handle};
 use hashbrown::HashMap;
-use node_tree::{NodeLink, NodeTree};
 
 use crate::{Event, Pearl};
 
@@ -70,14 +69,8 @@ impl<P> Deref for Removed<'_, P> {
     }
 }
 
-type NodeData = HashMap<TypeId, Link<()>>;
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
-pub struct Node(pub(super) NodeLink<NodeData>);
-
 #[derive(Default)]
 pub struct World {
-    nodes: NodeTree<NodeData>,
     types: HashMap<TypeId, Handle<Box<dyn Any>>>,
     pearls: DenseHandleMap<Box<dyn Any>>,
     events: HashMap<TypeId, Box<dyn Any>>,
@@ -88,47 +81,13 @@ impl World {
         Self::default()
     }
 
-    pub fn spawn(&mut self) -> Node {
-        Node(self.nodes.insert(Default::default()))
-    }
-
-    pub fn spawn_with_parent(&mut self, parent: Node) -> Node {
-        Node(self.nodes.insert_with_parent(Default::default(), parent.0))
-    }
-
-    pub fn contains_node(self, node: Node) -> bool {
-        self.nodes.contains(node.0)
-    }
-
-    pub fn contains_pearl<P: Pearl>(&self, link: Link<P>) -> bool {
-        self.get_pearl(link).is_some()
-    }
-
-    pub fn get_parent(&self, node: Node) -> Option<Node> {
-        Some(Node(self.nodes.parent_of(node.0)?))
-    }
-
-    pub fn set_parent(&mut self, child: Node, parent: Option<Node>) -> bool {
-        self.nodes.set_parent(child.0, parent.map(|n| n.0))
-    }
-
-    pub fn get_children(&self, node: Node) -> Option<Box<[Node]>> {
-        let node_children = self.nodes.children_of(node.0)?;
-        Some(node_children.map(|n| Node(*n)).collect())
-    }
-
-    pub fn get_pearl<P: Pearl>(&self, link: Link<P>) -> Option<&P> {
+    pub fn get<P: Pearl>(&self, link: Link<P>) -> Option<&P> {
         let any = self.pearls.get_data(link.map_handle)?;
         let map = any.downcast_ref::<PearlMap<P>>().unwrap();
         map.get_data(link.pearl_handle)
     }
 
-    pub fn find_pearl<P: Pearl>(&self, node: Node) -> Option<Link<P>> {
-        let node_data = self.nodes.get(node.0)?;
-        Some(node_data.get(&TypeId::of::<P>())?.into_type())
-    }
-
-    pub fn get_pearl_mut<P: Pearl>(&mut self, link: Link<P>) -> Option<&mut P> {
+    pub fn get_mut<P: Pearl>(&mut self, link: Link<P>) -> Option<&mut P> {
         let any = self.pearls.get_data_mut(link.map_handle)?;
         let map = any.downcast_mut::<PearlMap<P>>().unwrap();
         map.get_data_mut(link.pearl_handle)
@@ -162,7 +121,7 @@ impl World {
         map.iter_mut()
     }
 
-    pub fn add_listener<E: Event>(&mut self, listener: EventListener<E>) {
+    pub fn listen<E: Event>(&mut self, listener: EventListener<E>) {
         use hashbrown::hash_map::Entry;
         match self.events.entry(TypeId::of::<E>()) {
             Entry::Occupied(e) => {
@@ -178,19 +137,16 @@ impl World {
         }
     }
 
-    pub fn add_pearl<P: Pearl>(&mut self, node: Node, pearl: P) -> Result<Link<P>, P> {
-        if self.nodes.get(node.0).is_none() {
-            return Err(pearl);
-        }
-
+    pub fn insert<P: Pearl>(&mut self, pearl: P) -> Link<P> {
         let pearl_id = TypeId::of::<P>();
         use hashbrown::hash_map::Entry as E;
-        let (map_handle, new_type) = match self.types.entry(pearl_id) {
-            E::Occupied(e) => (*e.get(), false),
+        let map_handle = match self.types.entry(pearl_id) {
+            E::Occupied(e) => *e.get(),
             E::Vacant(e) => {
                 let map = Box::new(PearlMap::<P>::new());
                 let handle = *e.insert(self.pearls.insert(map));
-                (handle, true)
+                P::init_type(self);
+                handle
             }
         };
 
@@ -202,11 +158,8 @@ impl World {
             pearl_handle,
         };
 
-        let node_data = self.nodes.get_mut(node.0).unwrap();
-        node_data.insert(pearl_id, link.into_type());
         P::on_insert(link, self);
-        new_type.then(|| P::init_type(self));
-        Ok(link)
+        link
     }
 
     pub fn trigger<'a, E: Event>(&mut self, event: &mut E::Data<'a>) {
