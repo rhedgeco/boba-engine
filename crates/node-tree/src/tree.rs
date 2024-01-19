@@ -74,13 +74,17 @@ pub enum SetParentError {
     InvalidParent,
 }
 
+pub type Iter<'a, T> = indexmap::set::Iter<'a, T>;
+
 pub struct NodeTree<T> {
+    roots: IndexSet<Node<T>>,
     nodes: DenseHandleMap<NodeData<T>>,
 }
 
 impl<T> Default for NodeTree<T> {
     fn default() -> Self {
         Self {
+            roots: Default::default(),
             nodes: Default::default(),
         }
     }
@@ -111,20 +115,28 @@ impl<T> NodeTree<T> {
             .ok_or(GetParentError::NoParent)
     }
 
-    pub fn children_of(&self, node: Node<T>) -> Option<impl Iterator<Item = &Node<T>>> {
+    pub fn roots(&self) -> Iter<Node<T>> {
+        self.roots.iter()
+    }
+
+    pub fn children_of(&self, node: Node<T>) -> Option<Iter<Node<T>>> {
         let node_children = &self.nodes.get_data(node.0)?.children;
         Some(node_children.iter())
     }
 
     pub fn insert(&mut self, data: T) -> Node<T> {
-        Node(self.nodes.insert(NodeData::new(data)))
+        let node = Node(self.nodes.insert(NodeData::new(data)));
+        self.roots.insert(node);
+        node
     }
 
     pub fn insert_with_parent(&mut self, data: T, parent: Node<T>) -> Node<T> {
-        let node = self.insert(data);
+        let node = Node(self.nodes.insert(NodeData::new(data)));
         if let Some(parent_data) = self.nodes.get_data_mut(parent.0) {
             parent_data.children.insert(node);
             self.nodes.get_data_mut(node.0).unwrap().parent = Some(parent);
+        } else {
+            self.roots.insert(node);
         }
         node
     }
@@ -139,6 +151,11 @@ impl<T> NodeTree<T> {
             parent_data.children.remove(&node);
             for child in node_data.children.iter() {
                 parent_data.children.insert(*child);
+            }
+        } else {
+            self.roots.remove(&node);
+            for child in node_data.children.iter() {
+                self.roots.insert(*child);
             }
         }
 
@@ -174,10 +191,13 @@ impl<T> NodeTree<T> {
         if let Some(old_parent) = old_parent_option {
             let old_parent_data = self.nodes.get_data_mut(old_parent.0).unwrap();
             old_parent_data.children.remove(&child);
+        } else {
+            self.roots.remove(&child);
         };
 
         // if the parent was set to None we are done
         let Some(parent) = parent_option else {
+            self.roots.insert(child);
             return Ok(());
         };
 
@@ -230,6 +250,11 @@ mod tests {
         let node1 = tree.insert(42);
         assert!(tree.contains(node1));
         assert_eq!(tree.get(node1), Some(&42));
+
+        // test roots
+        let mut roots = tree.roots();
+        assert_eq!(roots.next(), Some(&node1));
+        assert_eq!(roots.next(), None);
     }
 
     #[test]
@@ -237,6 +262,10 @@ mod tests {
         let mut tree = NodeTree::<u32>::new();
         let node1 = tree.insert(42);
         assert_eq!(tree.remove(node1), Some(42));
+
+        // test roots
+        let mut roots = tree.roots();
+        assert_eq!(roots.next(), None);
     }
 
     #[test]
@@ -253,6 +282,11 @@ mod tests {
         let stem = tree.insert("stem");
         tree.set_parent(stem, Some(root)).unwrap();
         let leaf2 = tree.insert_with_parent("leaf2", stem);
+
+        // test roots
+        let mut roots = tree.roots();
+        assert_eq!(roots.next(), Some(&root));
+        assert_eq!(roots.next(), None);
 
         // test parent links
         assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
@@ -301,6 +335,11 @@ mod tests {
         //       \
         //        \ leaf3
 
+        // test roots
+        let mut roots = tree.roots();
+        assert_eq!(roots.next(), Some(&root));
+        assert_eq!(roots.next(), None);
+
         // check if parents were transferred
         assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
         assert_eq!(tree.parent_of(leaf1), Ok(root));
@@ -327,6 +366,13 @@ mod tests {
         // - leaf1
         // - leaf2
         // - leaf3
+
+        // test roots
+        let mut roots = tree.roots();
+        assert_eq!(roots.next(), Some(&leaf1));
+        assert_eq!(roots.next(), Some(&leaf2));
+        assert_eq!(roots.next(), Some(&leaf3));
+        assert_eq!(roots.next(), None);
 
         // check if parents were transferred
         assert_eq!(tree.parent_of(leaf1), Err(GetParentError::NoParent));
@@ -364,6 +410,11 @@ mod tests {
         //                      / leaf2
         // root - leaf1 - stem -
         //                      \ leaf3
+
+        // test roots
+        let mut roots = tree.roots();
+        assert_eq!(roots.next(), Some(&root));
+        assert_eq!(roots.next(), None);
 
         // check if parents were transferred
         assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
@@ -417,6 +468,11 @@ mod tests {
         //        \ leaf3 -
         //                 \ stem -
         //                         \ leaf2
+
+        // test roots
+        let mut roots = tree.roots();
+        assert_eq!(roots.next(), Some(&root));
+        assert_eq!(roots.next(), None);
 
         // check if parents were transferred
         assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
