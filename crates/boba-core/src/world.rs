@@ -1,9 +1,9 @@
 use std::{
     any::{Any, TypeId},
     hash::Hash,
-    ops::{Deref, DerefMut},
 };
 
+use derive_more::{Deref, DerefMut};
 use handle_map::{map::DenseHandleMap, Handle};
 use hashbrown::HashMap;
 
@@ -51,23 +51,17 @@ impl<P> Link<P> {
     }
 }
 
-/// A struct used for calling the `on_remove` method of pearls.
-/// This struct cannot be created manually so it prevents the function from being called.
+/// A struct used while calling [`Pearl::on_remove`].
+///
+/// Directly derefs to the underlying [`Pearl`].
+#[derive(Deref, DerefMut)]
 pub struct Removed<'a, P>(&'a mut P);
 
-impl<P> DerefMut for Removed<'_, P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<P> Deref for Removed<'_, P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+/// A struct used while calling [`Pearl::on_insert`].
+///
+/// Directly derefs to a [`Link`].
+#[derive(Deref)]
+pub struct Inserted<P>(Link<P>);
 
 #[derive(Default)]
 pub struct World {
@@ -172,7 +166,7 @@ impl World {
             pearl_handle,
         };
 
-        P::on_insert(link, self);
+        P::on_insert(Inserted(link), self);
         link
     }
 
