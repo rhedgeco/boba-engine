@@ -1,5 +1,5 @@
 use crate::{
-    tree::{GetParentError, Node, SetParentError},
+    tree::{GetParentError, Node},
     NodeTree,
 };
 
@@ -29,45 +29,42 @@ impl<'a, T> TreeWalker<'a, T> {
         self.tree.get_mut(self.node).unwrap()
     }
 
-    pub fn remove_current(self) -> T {
-        self.tree.remove(self.node).unwrap()
-    }
-
-    pub fn get_parent(&self) -> Option<Node<T>> {
-        match self.tree.parent_of(self.node) {
-            Ok(parent) => Some(parent),
-            Err(GetParentError::NoParent) => None,
-            _ => unreachable!(), // current node is garunteed to be valid
-        }
-    }
-
-    pub fn set_parent(&mut self, parent: Option<Node<T>>) -> bool {
-        match self.tree.set_parent(self.node, parent) {
-            Ok(_) => true,
-            Err(SetParentError::InvalidParent) => false,
-            _ => unreachable!(), // current node is garunteed to be valid
-        }
-    }
-
-    pub fn get_children(&self) -> Box<[Node<T>]> {
-        self.tree.children_of(self.node).unwrap().copied().collect()
-    }
-
-    pub fn jump_to(&mut self, node: Node<T>) -> bool {
-        if !self.tree.contains(node) {
-            return false;
-        }
-
-        self.node = node;
-        true
-    }
-
-    pub fn jump_to_parent(&mut self) -> bool {
-        let Some(parent) = self.get_parent() else {
-            return false;
+    pub fn parent<'b>(&'b mut self) -> Option<TreeWalker<'b, T>> {
+        let node = match self.tree.parent_of(self.node) {
+            Ok(parent) => parent,
+            Err(GetParentError::NoParent) => return None,
+            _ => unreachable!(), // node is garunteed to be valid
         };
+        Some(TreeWalker {
+            tree: self.tree,
+            node,
+        })
+    }
 
-        self.node = parent;
-        true
+    pub fn children(&mut self) -> ChildWalker<T> {
+        ChildWalker {
+            children: self.tree.children_of(self.node).unwrap().cloned().collect(),
+            tree: self.tree,
+            current: 0,
+        }
+    }
+}
+
+pub struct ChildWalker<'a, T> {
+    children: Box<[Node<T>]>,
+    tree: &'a mut NodeTree<T>,
+    current: usize,
+}
+
+impl<'a, T> ChildWalker<'a, T> {
+    pub fn walk_next(&mut self) -> Option<TreeWalker<T>> {
+        let child = *self.children.get(self.current)?;
+        match self.tree.contains(child) {
+            false => self.walk_next(),
+            true => Some(TreeWalker {
+                tree: self.tree,
+                node: child,
+            }),
+        }
     }
 }
