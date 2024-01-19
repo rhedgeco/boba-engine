@@ -59,11 +59,19 @@ impl<T> NodeData<T> {
 }
 
 #[derive(Debug, PartialEq, Eq, Error)]
-pub enum ParentError {
+pub enum GetParentError {
     #[error("child node is not valid")]
     InvalidNode,
     #[error("node has no parent")]
     NoParent,
+}
+
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum SetParentError {
+    #[error("child node is not valid")]
+    InvalidChild,
+    #[error("parent node is not valid")]
+    InvalidParent,
 }
 
 pub struct NodeTree<T> {
@@ -95,12 +103,12 @@ impl<T> NodeTree<T> {
         Some(&mut self.nodes.get_data_mut(node.0)?.data)
     }
 
-    pub fn parent_of(&self, node: Node<T>) -> Result<Node<T>, ParentError> {
+    pub fn parent_of(&self, node: Node<T>) -> Result<Node<T>, GetParentError> {
         self.nodes
             .get_data(node.0)
-            .ok_or(ParentError::InvalidNode)?
+            .ok_or(GetParentError::InvalidNode)?
             .parent
-            .ok_or(ParentError::NoParent)
+            .ok_or(GetParentError::NoParent)
     }
 
     pub fn children_of(&self, node: Node<T>) -> Option<impl Iterator<Item = &Node<T>>> {
@@ -144,15 +152,19 @@ impl<T> NodeTree<T> {
         Some(node_data.data)
     }
 
-    pub fn set_parent(&mut self, child: Node<T>, parent_option: Option<Node<T>>) -> bool {
+    pub fn set_parent(
+        &mut self,
+        child: Node<T>,
+        parent_option: Option<Node<T>>,
+    ) -> Result<(), SetParentError> {
         // early return if the parent is Some and doesnt exist
         if parent_option.is_some_and(|parent| !self.nodes.contains(parent.0)) {
-            return false;
+            return Err(SetParentError::InvalidParent);
         }
 
         // if child doesnt exist, return false
         let Some(child_data) = self.nodes.get_data_mut(child.0) else {
-            return false;
+            return Err(SetParentError::InvalidChild);
         };
 
         // replace childs parent
@@ -166,7 +178,7 @@ impl<T> NodeTree<T> {
 
         // if the parent was set to None we are done
         let Some(parent) = parent_option else {
-            return true;
+            return Ok(());
         };
 
         // add the child to the new parents children list
@@ -175,7 +187,7 @@ impl<T> NodeTree<T> {
 
         // resolve recusrive tree branches by walking up each parent
         resolve_recursive(self, parent, child, old_parent_option);
-        return true;
+        return Ok(());
 
         fn resolve_recursive<T>(
             tree: &mut NodeTree<T>,
@@ -239,11 +251,11 @@ mod tests {
         let root = tree.insert("root");
         let leaf1 = tree.insert_with_parent("leaf1", root);
         let stem = tree.insert("stem");
-        tree.set_parent(stem, Some(root));
+        tree.set_parent(stem, Some(root)).unwrap();
         let leaf2 = tree.insert_with_parent("leaf2", stem);
 
         // test parent links
-        assert_eq!(tree.parent_of(root), Err(ParentError::NoParent));
+        assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
         assert_eq!(tree.parent_of(leaf1), Ok(root));
         assert_eq!(tree.parent_of(stem), Ok(root));
         assert_eq!(tree.parent_of(leaf2), Ok(stem));
@@ -290,7 +302,7 @@ mod tests {
         //        \ leaf3
 
         // check if parents were transferred
-        assert_eq!(tree.parent_of(root), Err(ParentError::NoParent));
+        assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
         assert_eq!(tree.parent_of(leaf1), Ok(root));
         assert_eq!(tree.parent_of(leaf2), Ok(root));
         assert_eq!(tree.parent_of(leaf3), Ok(root));
@@ -317,9 +329,9 @@ mod tests {
         // - leaf3
 
         // check if parents were transferred
-        assert_eq!(tree.parent_of(leaf1), Err(ParentError::NoParent));
-        assert_eq!(tree.parent_of(leaf2), Err(ParentError::NoParent));
-        assert_eq!(tree.parent_of(leaf3), Err(ParentError::NoParent));
+        assert_eq!(tree.parent_of(leaf1), Err(GetParentError::NoParent));
+        assert_eq!(tree.parent_of(leaf2), Err(GetParentError::NoParent));
+        assert_eq!(tree.parent_of(leaf3), Err(GetParentError::NoParent));
 
         // double check children
         assert_eq!(tree.children_of(leaf1).unwrap().next(), None);
@@ -345,7 +357,7 @@ mod tests {
         let leaf3 = tree.insert_with_parent("leaf3", stem);
 
         // reparent stem to the leaf1 node
-        assert!(tree.set_parent(stem, Some(leaf1)));
+        assert!(tree.set_parent(stem, Some(leaf1)).is_ok());
 
         // tree structure
         //
@@ -354,7 +366,7 @@ mod tests {
         //                      \ leaf3
 
         // check if parents were transferred
-        assert_eq!(tree.parent_of(root), Err(ParentError::NoParent));
+        assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
         assert_eq!(tree.parent_of(leaf1), Ok(root));
         assert_eq!(tree.parent_of(stem), Ok(leaf1));
         assert_eq!(tree.parent_of(leaf2), Ok(stem));
@@ -395,7 +407,7 @@ mod tests {
         let leaf4 = tree.insert_with_parent("leaf4", leaf3);
 
         // set stem parent to leaf3 making a recursive loop
-        assert!(tree.set_parent(stem, Some(leaf3)));
+        assert!(tree.set_parent(stem, Some(leaf3)).is_ok());
 
         // tree structure
         //
@@ -407,7 +419,7 @@ mod tests {
         //                         \ leaf2
 
         // check if parents were transferred
-        assert_eq!(tree.parent_of(root), Err(ParentError::NoParent));
+        assert_eq!(tree.parent_of(root), Err(GetParentError::NoParent));
         assert_eq!(tree.parent_of(leaf1), Ok(root));
         assert_eq!(tree.parent_of(leaf3), Ok(root));
         assert_eq!(tree.parent_of(leaf4), Ok(leaf3));

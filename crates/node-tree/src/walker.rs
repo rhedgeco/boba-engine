@@ -1,5 +1,5 @@
 use crate::{
-    tree::{Node, ParentError},
+    tree::{GetParentError, Node, SetParentError},
     NodeTree,
 };
 
@@ -29,11 +29,23 @@ impl<'a, T> TreeWalker<'a, T> {
         self.tree.get_mut(self.node).unwrap()
     }
 
+    pub fn remove_current(self) -> T {
+        self.tree.remove(self.node).unwrap()
+    }
+
     pub fn get_parent(&self) -> Option<Node<T>> {
         match self.tree.parent_of(self.node) {
             Ok(parent) => Some(parent),
-            Err(ParentError::NoParent) => None,
-            _ => unreachable!(), // nodes are garunteed to be valid
+            Err(GetParentError::NoParent) => None,
+            _ => unreachable!(), // current node is garunteed to be valid
+        }
+    }
+
+    pub fn set_parent(&mut self, parent: Option<Node<T>>) -> bool {
+        match self.tree.set_parent(self.node, parent) {
+            Ok(_) => true,
+            Err(SetParentError::InvalidParent) => false,
+            _ => unreachable!(), // current node is garunteed to be valid
         }
     }
 
