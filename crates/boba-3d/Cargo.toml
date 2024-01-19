@@ -1,0 +1,11 @@
+[package]
+name = "boba-3d"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+glam = "0.25"
+indexmap = "2.1"
+hashbrown = "0.14"
+boba-core = { path = "../boba-core" }
+node-tree = { path = "../node-tree" }
