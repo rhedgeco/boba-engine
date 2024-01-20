@@ -59,6 +59,7 @@ pub struct ChildWalker<'a, T> {
 impl<'a, T> ChildWalker<'a, T> {
     pub fn walk_next(&mut self) -> Option<TreeWalker<T>> {
         let child = *self.children.get(self.current)?;
+        self.current += 1;
         match self.tree.contains(child) {
             false => self.walk_next(),
             true => Some(TreeWalker {

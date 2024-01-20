@@ -5,4 +5,6 @@ pub mod prelude {
         world::{Link, Removed},
         Event, Pearl, World,
     };
+
+    pub use boba_3d::{glam::*, transform::Link as TransformLink, Transform, TransformTree};
 }

@@ -1,6 +1,5 @@
 use std::{
     any::TypeId,
-    iter::Map,
     ops::{Deref, DerefMut},
 };
 
@@ -10,7 +9,6 @@ use hashbrown::HashMap;
 use indexmap::IndexSet;
 use node_tree::{tree::Node, walker::ChildWalker, NodeTree, TreeWalker};
 
-#[derive(Default)]
 pub struct Transform {
     pub local_matrix: Mat4,
     pub world_matrix: Mat4,
@@ -24,7 +22,21 @@ pub struct Transform {
     linked_pearls: HashMap<TypeId, IndexSet<world::Link<()>>>,
 }
 
-pub type Iter<'a, P> = Map<indexmap::set::Iter<'a, world::Link<()>>, world::Link<P>>;
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            local_matrix: Mat4::IDENTITY,
+            world_matrix: Mat4::IDENTITY,
+            local_pos: Vec3::ZERO,
+            world_pos: Vec3::ZERO,
+            local_rot: Quat::IDENTITY,
+            world_rot: Quat::IDENTITY,
+            local_scale: Vec3::ONE,
+            lossy_scale: Vec3::ONE,
+            linked_pearls: Default::default(),
+        }
+    }
+}
 
 impl Transform {
     pub fn linked_pearls<P: Pearl>(&self) -> Box<[world::Link<P>]> {
@@ -35,6 +47,7 @@ impl Transform {
     }
 }
 
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Link(Node<Transform>);
 
 pub struct TransformTree {
@@ -65,6 +78,27 @@ impl TransformTree {
     pub fn root_view(&mut self) -> View {
         let walker = TreeWalker::new(&mut self.tree, self.root).unwrap();
         View(walker)
+    }
+
+    pub fn spawn(&mut self) -> Link {
+        let root_matrix = self.tree.get(self.root).unwrap().world_matrix;
+        let transform = Transform {
+            world_matrix: root_matrix,
+            ..Default::default()
+        };
+        Link(self.tree.insert_with_parent(transform, self.root))
+    }
+
+    pub fn spawn_with_parent(&mut self, parent: Link) -> Link {
+        let transform = match self.tree.get(parent.0) {
+            None => Transform::default(),
+            Some(data) => Transform {
+                world_matrix: data.world_matrix,
+                ..Default::default()
+            },
+        };
+
+        Link(self.tree.insert_with_parent(transform, parent.0))
     }
 
     pub fn get(&self, link: Link) -> Option<&Transform> {
