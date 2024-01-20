@@ -1,4 +1,8 @@
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    ops::{Index, IndexMut},
+};
 
 use handle_map::{map::DenseHandleMap, Handle};
 use indexmap::IndexSet;
@@ -87,6 +91,20 @@ impl<T> Default for NodeTree<T> {
             roots: Default::default(),
             nodes: Default::default(),
         }
+    }
+}
+
+impl<T> IndexMut<Node<T>> for NodeTree<T> {
+    fn index_mut(&mut self, node: Node<T>) -> &mut Self::Output {
+        &mut self.nodes[node.0].data
+    }
+}
+
+impl<T> Index<Node<T>> for NodeTree<T> {
+    type Output = T;
+
+    fn index(&self, node: Node<T>) -> &Self::Output {
+        &self.nodes[node.0].data
     }
 }
 

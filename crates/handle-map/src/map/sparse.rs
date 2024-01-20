@@ -1,4 +1,7 @@
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    ops::{Index, IndexMut},
+};
 
 use crate::{map::HandleMapId, Handle};
 
@@ -44,6 +47,20 @@ impl<T> Default for SparseHandleMap<T> {
             data: Default::default(),
             open_data: Default::default(),
         }
+    }
+}
+
+impl<T> IndexMut<Handle<T>> for SparseHandleMap<T> {
+    fn index_mut(&mut self, handle: Handle<T>) -> &mut Self::Output {
+        self.get_data_mut(handle).expect("invalid handle")
+    }
+}
+
+impl<T> Index<Handle<T>> for SparseHandleMap<T> {
+    type Output = T;
+
+    fn index(&self, handle: Handle<T>) -> &Self::Output {
+        self.get_data(handle).expect("invalid handle")
     }
 }
 

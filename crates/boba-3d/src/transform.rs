@@ -1,6 +1,6 @@
 use std::{
     any::TypeId,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Index},
 };
 
 use boba_core::{world, Pearl};
@@ -63,6 +63,14 @@ impl Default for TransformTree {
             tree: node_tree,
             root,
         }
+    }
+}
+
+impl Index<Link> for TransformTree {
+    type Output = Transform;
+
+    fn index(&self, link: Link) -> &Self::Output {
+        &self.tree[link.0]
     }
 }
 

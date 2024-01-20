@@ -1,4 +1,5 @@
 use std::{
+    ops::{Index, IndexMut},
     slice::{Iter, IterMut},
     vec::IntoIter,
 };
@@ -32,6 +33,20 @@ impl<T> Default for DenseHandleMap<T> {
             back_link: Default::default(),
             data: Default::default(),
         }
+    }
+}
+
+impl<T> IndexMut<Handle<T>> for DenseHandleMap<T> {
+    fn index_mut(&mut self, handle: Handle<T>) -> &mut Self::Output {
+        self.get_data_mut(handle).expect("invalid handle")
+    }
+}
+
+impl<T> Index<Handle<T>> for DenseHandleMap<T> {
+    type Output = T;
+
+    fn index(&self, handle: Handle<T>) -> &Self::Output {
+        self.get_data(handle).expect("invalid handle")
     }
 }
 
