@@ -96,6 +96,17 @@ dependencies = [
  "handle-map",
  "hashbrown",
  "indexmap",
+ "log",
+]
+
+[[package]]
+name = "boba-core-old"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "handle-map",
+ "hashbrown",
+ "indexmap",
 ]
 
 [[package]]

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+log = "0.4"
 indexmap = "2.1"
 hashbrown = "0.14"
 derive_more = "0.99"

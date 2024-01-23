@@ -2,49 +2,35 @@ use std::time::Instant;
 
 use boba_engine::prelude::*;
 
-#[derive(Debug)]
-pub struct FpsPearl;
-
-impl FpsPearl {
-    fn update(&self, delta: f64) {
-        println!("FPS: {}", 1. / delta);
-    }
-}
-
-impl Pearl for FpsPearl {
-    fn init_type(world: &mut World) {
-        world.listen::<UpdateEvent>(|world, delta| {
-            for pearl in world.iter::<Self>() {
-                pearl.update(*delta);
-            }
-        });
-    }
-}
+struct Update;
+impl SimpleEvent for Update {}
 
 #[derive(Default)]
-pub struct UpdateEvent {
+struct FpsPrinter {
     instant: Option<Instant>,
 }
 
-impl Event for UpdateEvent {
-    type Data<'a> = f64;
+impl Pearl for FpsPrinter {
+    fn register(source: &mut impl EventSource<Self>) {
+        source.listen::<Update>();
+    }
 }
 
-impl UpdateEvent {
-    pub fn lap(&mut self) -> Option<f64> {
-        let last = self.instant.replace(Instant::now())?;
-        Some(Instant::now().duration_since(last).as_secs_f64())
+impl Listener<Update> for FpsPrinter {
+    fn update(mut view: View<'_, Self>, _: &Update) {
+        let Some(past) = view.instant.replace(Instant::now()) else {
+            return;
+        };
+
+        let delta = Instant::now().duration_since(past).as_secs_f64();
+        println!("FPS: {}", 1. / delta);
     }
 }
 
 fn main() {
     let mut world = World::new();
-    world.insert_pearl(FpsPearl);
-
-    let mut update = UpdateEvent::default();
+    world.insert(FpsPrinter::default());
     loop {
-        if let Some(mut delta) = update.lap() {
-            world.trigger::<UpdateEvent>(&mut delta);
-        }
+        world.trigger_simple(&Update);
     }
 }
