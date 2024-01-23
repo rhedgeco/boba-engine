@@ -5,13 +5,13 @@ use std::{
     slice::{Iter, IterMut},
 };
 
-use handle_map::map::SparseHandleMap;
+use handle_map::{map::SparseHandleMap, Handle};
 use hashbrown::HashMap;
 use indexmap::IndexMap;
 
 use crate::{
     pearl::{Event, SimpleEvent},
-    world::maps::PearlMap,
+    world::{maps::PearlMap, View},
     Pearl,
 };
 
@@ -53,21 +53,19 @@ impl<P> PartialEq for Link<P> {
 
 impl<P> Link<P> {
     #[doc(hidden)]
+    pub fn from_raw(map: u64, pearl: u64) -> Self {
+        Self {
+            map_handle: Handle::from_raw(map),
+            pearl_handle: Handle::from_raw(pearl),
+        }
+    }
+
+    #[doc(hidden)]
     pub fn into_type<T>(self) -> Link<T> {
         Link {
             map_handle: self.map_handle,
             pearl_handle: self.pearl_handle.into_type(),
         }
-    }
-}
-
-pub struct InsertLink<P>(Link<P>);
-
-impl<P> Deref for InsertLink<P> {
-    type Target = Link<P>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -111,6 +109,10 @@ pub struct World {
 impl World {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn contains<P: 'static>(&self, link: Link<P>) -> bool {
+        self.get(link).is_some()
     }
 
     pub fn get<P: 'static>(&self, link: Link<P>) -> Option<&P> {
@@ -158,6 +160,10 @@ impl World {
     }
 
     pub fn insert<P: Pearl>(&mut self, pearl: P) -> Link<P> {
+        self.insert_and(pearl, |_| {})
+    }
+
+    pub fn insert_and<P: Pearl>(&mut self, pearl: P, f: impl FnOnce(&mut View<P>)) -> Link<P> {
         use hashbrown::hash_map::Entry as E;
         let link = match self.pearl_data.entry(TypeId::of::<P>()) {
             E::Occupied(e) => {
@@ -182,7 +188,10 @@ impl World {
             }
         };
 
-        P::on_insert(InsertLink(link), self);
+        let pearl_ptr = self.get(link).unwrap() as *const P as *mut P;
+        let mut view = unsafe { View::new(self, pearl_ptr) };
+        P::on_insert(&mut view, link);
+        f(&mut view);
         link
     }
 
@@ -241,8 +250,8 @@ mod sealed {
 
         for pearl in pearls {
             let pearl_ptr = pearl as *const P as *mut P;
-            let view = unsafe { View::new(world, pearl_ptr) };
-            P::update(view, data)
+            let mut view = unsafe { View::new(world, pearl_ptr) };
+            P::update(&mut view, data)
         }
     }
 

@@ -1,5 +1,5 @@
 pub mod transform;
 
-pub use transform::{Transform, TransformTree};
+pub use transform::Transform;
 
 pub use glam;

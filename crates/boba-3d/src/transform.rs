@@ -1,25 +1,27 @@
-use std::{
-    any::TypeId,
-    ops::{Deref, DerefMut, Index},
+use boba_core::{
+    world::{Link, Removed, View},
+    Pearl, World,
 };
-
-use boba_core::{world, Pearl};
+use extension_trait::extension_trait;
 use glam::{Mat4, Quat, Vec3};
-use hashbrown::HashMap;
 use indexmap::IndexSet;
-use node_tree::{tree::Node, walker::ChildWalker, NodeTree, TreeWalker};
+
+pub type Iter<'a> = indexmap::set::Iter<'a, Link<Transform>>;
 
 pub struct Transform {
-    pub local_matrix: Mat4,
-    pub world_matrix: Mat4,
-    pub local_pos: Vec3,
-    pub world_pos: Vec3,
-    pub local_rot: Quat,
-    pub world_rot: Quat,
-    pub local_scale: Vec3,
-    pub lossy_scale: Vec3,
+    local_matrix: Mat4,
+    world_matrix: Mat4,
+    local_pos: Vec3,
+    world_pos: Vec3,
+    local_rot: Quat,
+    world_rot: Quat,
+    local_scale: Vec3,
+    lossy_scale: Vec3,
+    pending_sync: bool,
 
-    linked_pearls: HashMap<TypeId, IndexSet<world::Link<()>>>,
+    link: Link<Self>,
+    parent: Option<Link<Self>>,
+    children: IndexSet<Link<Self>>,
 }
 
 impl Default for Transform {
@@ -33,236 +35,307 @@ impl Default for Transform {
             world_rot: Quat::IDENTITY,
             local_scale: Vec3::ONE,
             lossy_scale: Vec3::ONE,
-            linked_pearls: Default::default(),
+            pending_sync: false,
+            link: Link::from_raw(0, 0),
+            parent: None,
+            children: IndexSet::new(),
+        }
+    }
+}
+
+impl Pearl for Transform {
+    fn on_insert(view: &mut View<'_, Self>, link: Link<Self>) {
+        view.link = link;
+        view.pending_sync = false;
+    }
+
+    fn on_remove(mut pearl: Removed<Self>, world: &mut World) {
+        // remove the parent
+        let parent_option = pearl.parent.take();
+
+        // remove the pearl from its parents children list
+        if let Some(parent) = parent_option {
+            world.get_mut(parent).unwrap().children.remove(&pearl.link);
+        }
+
+        // remove the pearl from its childrens parent slot
+        for child in pearl.children.drain(..) {
+            world.get_mut(child).unwrap().parent = parent_option;
+        }
+    }
+
+    fn on_view_drop(view: &mut View<Self>) {
+        if view.pending_sync {
+            view.sync_transforms();
         }
     }
 }
 
 impl Transform {
-    pub fn linked_pearls<P: Pearl>(&self) -> Box<[world::Link<P>]> {
-        match self.linked_pearls.get(&TypeId::of::<P>()) {
-            Some(set) => set.iter().map(|link| link.into_type()).collect(),
-            None => Box::new([]),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
-pub struct Link(Node<Transform>);
-
-pub struct TransformTree {
-    tree: NodeTree<Transform>,
-    root: Node<Transform>,
-}
-
-impl Default for TransformTree {
-    fn default() -> Self {
-        let mut node_tree = NodeTree::new();
-        let root = node_tree.insert(Transform::default());
-        Self {
-            tree: node_tree,
-            root,
-        }
-    }
-}
-
-impl Index<Link> for TransformTree {
-    type Output = Transform;
-
-    fn index(&self, link: Link) -> &Self::Output {
-        &self.tree[link.0]
-    }
-}
-
-impl TransformTree {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn root(&self) -> &Transform {
-        self.tree.get(self.root).unwrap()
+    pub fn from_pos(pos: Vec3) -> Self {
+        Self::from_pos_rot_scale(pos, Quat::IDENTITY, Vec3::ONE)
     }
 
-    pub fn root_view(&mut self) -> View {
-        let walker = TreeWalker::new(&mut self.tree, self.root).unwrap();
-        View(walker)
+    pub fn from_rot(rot: Quat) -> Self {
+        Self::from_pos_rot_scale(Vec3::ZERO, rot, Vec3::ONE)
     }
 
-    pub fn spawn(&mut self) -> Link {
-        let root_matrix = self.tree.get(self.root).unwrap().world_matrix;
-        let transform = Transform {
-            world_matrix: root_matrix,
+    pub fn from_scale(scale: Vec3) -> Self {
+        Self::from_pos_rot_scale(Vec3::ZERO, Quat::IDENTITY, scale)
+    }
+
+    pub fn from_pos_rot(pos: Vec3, rot: Quat) -> Self {
+        Self::from_pos_rot_scale(pos, rot, Vec3::ONE)
+    }
+
+    pub fn from_pos_scale(pos: Vec3, scale: Vec3) -> Self {
+        Self::from_pos_rot_scale(pos, Quat::IDENTITY, scale)
+    }
+
+    pub fn from_rot_scale(rot: Quat, scale: Vec3) -> Self {
+        Self::from_pos_rot_scale(Vec3::ZERO, rot, scale)
+    }
+
+    pub fn from_pos_rot_scale(pos: Vec3, rot: Quat, scale: Vec3) -> Self {
+        let matrix = Mat4::from_scale_rotation_translation(scale, rot, pos);
+        Self {
+            local_matrix: matrix,
+            world_matrix: matrix,
+            local_pos: pos,
+            world_pos: pos,
+            local_rot: rot,
+            world_rot: rot,
+            local_scale: scale,
+            lossy_scale: scale,
             ..Default::default()
+        }
+    }
+
+    pub fn local_matrix(&self) -> Mat4 {
+        self.local_matrix
+    }
+
+    pub fn world_matrix(&self) -> Mat4 {
+        self.world_matrix
+    }
+
+    pub fn local_pos(&self) -> Vec3 {
+        self.local_pos
+    }
+
+    pub fn world_pos(&self) -> Vec3 {
+        self.world_pos
+    }
+
+    pub fn set_local_pos_no_sync(&mut self, pos: Vec3) {
+        self.local_pos = pos;
+        self.pending_sync = true;
+    }
+
+    pub fn local_rot(&self) -> Quat {
+        self.local_rot
+    }
+
+    pub fn world_rot(&self) -> Quat {
+        self.world_rot
+    }
+
+    pub fn set_local_rot_no_sync(&mut self, rot: Quat) {
+        self.local_rot = rot;
+        self.pending_sync = true;
+    }
+
+    pub fn local_scale(&self) -> Vec3 {
+        self.local_scale
+    }
+
+    pub fn lossy_scale(&self) -> Vec3 {
+        self.lossy_scale
+    }
+
+    pub fn set_local_scale_no_sync(&mut self, scale: Vec3) {
+        self.local_scale = scale;
+        self.pending_sync = true;
+    }
+
+    pub fn parent_link(&self) -> Option<Link<Self>> {
+        self.parent
+    }
+
+    pub fn child_links(&self) -> Iter {
+        self.children.iter()
+    }
+}
+
+#[extension_trait]
+impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
+    fn recalculate_local_matrix(&mut self) {
+        self.local_matrix =
+            Mat4::from_scale_rotation_translation(self.local_scale, self.local_rot, self.local_pos);
+        self.sync_transforms();
+    }
+
+    fn set_parent_no_sync(&mut self, parent_option: Option<Link<Transform>>) -> bool {
+        // early return if the parent is Some and doesnt exist
+        if parent_option.is_some_and(|parent| !self.world().contains(parent)) {
+            return false;
+        }
+
+        // replace childs parent
+        let old_parent_option = std::mem::replace(&mut self.parent, parent_option);
+
+        // if the old parent existed, remove the child from its children list
+        let current_link = self.link;
+        if let Some(old_parent_link) = old_parent_option {
+            let mut old_parent = self.to_pearl(old_parent_link).unwrap();
+            old_parent.children.remove(&current_link);
         };
-        Link(self.tree.insert_with_parent(transform, self.root))
-    }
 
-    pub fn spawn_with_parent(&mut self, parent: Link) -> Link {
-        let transform = match self.tree.get(parent.0) {
-            None => Transform::default(),
-            Some(data) => Transform {
-                world_matrix: data.world_matrix,
-                ..Default::default()
-            },
+        // if the parent was set to None we are done
+        let Some(parent_link) = parent_option else {
+            return true;
         };
 
-        Link(self.tree.insert_with_parent(transform, parent.0))
-    }
+        // add the child to the new parents children list
+        let mut parent = self.to_pearl(parent_link).unwrap();
+        parent.children.insert(current_link);
 
-    pub fn get(&self, link: Link) -> Option<&Transform> {
-        self.tree.get(link.0)
-    }
+        // resolve recusrive tree branches by walking up each parent
+        resolve_recursive(&mut parent, current_link, old_parent_option);
+        return true;
 
-    pub fn view(&mut self, link: Link) -> Option<View> {
-        let walker = TreeWalker::new(&mut self.tree, link.0)?;
-        Some(View(walker))
+        fn resolve_recursive(
+            parent: &mut View<Transform>,
+            source: Link<Transform>,
+            old_parent_option: Option<Link<Transform>>,
+        ) {
+            match parent.parent {
+                // if there are no more parents in the chain, early return
+                None => (),
+                // if next parent is not the source node, recurse up and check the next parent in the chain
+                Some(next_parent_link) if next_parent_link != source => {
+                    let mut next_parent = parent.to_pearl(next_parent_link).unwrap();
+                    resolve_recursive(&mut next_parent, source, old_parent_option)
+                }
+                // if a recursive loop was found, remove the recursive child from the source node
+                // and set the recursive childs parent to the source nodes old parent.
+                // also add the recursive child to the old parents children list
+                Some(next_parent_link) => {
+                    let parent_link = parent.link;
+                    parent.parent = old_parent_option;
+                    let mut next_parent = parent.to_pearl(next_parent_link).unwrap();
+                    next_parent.children.remove(&parent_link);
+                    if let Some(old_parent_link) = old_parent_option {
+                        let mut old_parent = next_parent.to_pearl(old_parent_link).unwrap();
+                        old_parent.children.insert(parent_link);
+                    }
+                }
+            }
+        }
     }
 }
 
-pub struct View<'a>(TreeWalker<'a, Transform>);
-
-impl<'a> DerefMut for View<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.data_mut()
-    }
-}
-
-impl<'a> Deref for View<'a> {
-    type Target = Transform;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.data()
-    }
-}
-
-impl<'a> View<'a> {
-    pub fn parent(&mut self) -> Option<View> {
-        self.0.parent().map(|walker| View(walker))
+#[extension_trait]
+pub impl<'a> TransformView<'a> for View<'a, Transform> {
+    fn parent(&mut self) -> Option<View<Transform>> {
+        Some(self.to_pearl(self.parent?).unwrap())
     }
 
-    pub fn children(&mut self) -> ViewChildren {
-        ViewChildren(self.0.children())
+    fn walk_children(&mut self) -> ChildWalker<'_, 'a> {
+        ChildWalker::new(self)
     }
 
-    pub fn set_local_pos(&mut self, pos: Vec3) {
+    fn set_local_pos(&mut self, pos: Vec3) {
         if self.local_pos == pos {
             return;
         }
 
-        self.0.data_mut().local_pos = pos;
+        self.local_pos = pos;
         self.recalculate_local_matrix();
     }
 
-    pub fn set_local_rot(&mut self, rot: Quat) {
+    fn set_local_rot(&mut self, rot: Quat) {
         if self.local_rot == rot {
             return;
         }
 
-        self.0.data_mut().local_rot = rot;
+        self.local_rot = rot;
         self.recalculate_local_matrix();
     }
 
-    pub fn set_local_scale(&mut self, scale: Vec3) {
+    fn set_local_scale(&mut self, scale: Vec3) {
         if self.local_scale == scale {
             return;
         }
 
-        self.0.data_mut().local_scale = scale;
+        self.local_scale = scale;
         self.recalculate_local_matrix();
-    }
-
-    pub fn set_local_pos_rot(&mut self, pos: Vec3, rot: Quat) {
-        if self.local_pos == pos && self.local_rot == rot {
-            return;
-        }
-
-        let data = self.0.data_mut();
-        data.local_pos = pos;
-        data.local_rot = rot;
-        self.recalculate_local_matrix();
-    }
-
-    pub fn set_local_pos_scale(&mut self, pos: Vec3, scale: Vec3) {
-        if self.local_pos == pos && self.local_scale == scale {
-            return;
-        }
-
-        let data = self.0.data_mut();
-        data.local_pos = pos;
-        data.local_scale = scale;
-        self.recalculate_local_matrix();
-    }
-
-    pub fn set_local_rot_scale(&mut self, rot: Quat, scale: Vec3) {
-        if self.local_rot == rot && self.local_scale == scale {
-            return;
-        }
-
-        let data = self.0.data_mut();
-        data.local_rot = rot;
-        data.local_scale = scale;
-        self.recalculate_local_matrix();
-    }
-
-    pub fn set_local_pos_rot_scale(&mut self, pos: Vec3, rot: Quat, scale: Vec3) {
-        if self.local_pos == pos && self.local_rot == rot && self.local_scale == scale {
-            return;
-        }
-
-        let data = self.0.data_mut();
-        data.local_pos = pos;
-        data.local_rot = rot;
-        data.local_scale = scale;
-        self.recalculate_local_matrix();
-    }
-
-    pub fn link_pearl<P: Pearl>(&mut self, link: world::Link<P>) {
-        use hashbrown::hash_map::Entry as E;
-        match self.0.data_mut().linked_pearls.entry(TypeId::of::<P>()) {
-            E::Vacant(e) => {
-                e.insert(IndexSet::new()).insert(link.into_type());
-            }
-            E::Occupied(e) => {
-                e.into_mut().insert(link.into_type());
-            }
-        }
-    }
-
-    pub fn unlink_pearl<P: Pearl>(&mut self, link: world::Link<P>) {
-        let Some(set) = self.0.data_mut().linked_pearls.get_mut(&TypeId::of::<P>()) else {
-            return;
-        };
-
-        set.remove(&link.into_type());
-    }
-
-    fn recalculate_local_matrix(&mut self) {
-        let data = self.0.data_mut();
-        self.0.data_mut().local_matrix =
-            Mat4::from_scale_rotation_translation(data.local_scale, data.local_rot, data.local_pos);
-        self.sync_transforms();
     }
 
     fn sync_transforms(&mut self) {
-        self.world_matrix = match self.0.parent() {
-            Some(parent) => parent.data().world_matrix * self.0.data().local_matrix,
-            None => self.0.data().local_matrix,
+        if !self.pending_sync {
+            return;
+        }
+
+        self.pending_sync = false;
+        let local_matrix = self.local_matrix;
+        let world_matrix = match self.parent() {
+            Some(parent) => parent.world_matrix * local_matrix,
+            None => local_matrix,
         };
 
+        self.world_matrix = world_matrix;
         (self.lossy_scale, self.world_rot, self.world_pos) =
             self.world_matrix.to_scale_rotation_translation();
 
-        let mut children = self.0.children();
-        while let Some(child) = children.walk_next() {
-            View(child).sync_transforms()
+        let mut children = self.walk_children();
+        while let Some(mut child) = children.walk_next() {
+            child.sync_transforms()
         }
+    }
+
+    fn unparent(&mut self) {
+        PrivateTransformView::set_parent_no_sync(self, None);
+    }
+
+    fn set_parent(&mut self, parent: Link<Transform>) -> bool {
+        if !TransformView::set_parent_no_sync(self, parent) {
+            return false;
+        }
+
+        self.sync_transforms();
+        return true;
+    }
+
+    fn set_parent_no_sync(&mut self, parent: Link<Transform>) -> bool {
+        self.pending_sync = true;
+        PrivateTransformView::set_parent_no_sync(self, Some(parent))
     }
 }
 
-pub struct ViewChildren<'a>(ChildWalker<'a, Transform>);
+pub struct ChildWalker<'a, 'source> {
+    view: &'a mut View<'source, Transform>,
+    children: Box<[Link<Transform>]>,
+    current: usize,
+}
 
-impl<'a> ViewChildren<'a> {
-    pub fn walk_next(&mut self) -> Option<View> {
-        self.0.walk_next().map(|walker| View(walker))
+impl<'a, 'source> ChildWalker<'a, 'source> {
+    pub fn new(view: &'a mut View<'source, Transform>) -> Self {
+        let children = view.child_links().copied().collect();
+        Self {
+            view,
+            children,
+            current: 0,
+        }
+    }
+
+    pub fn walk_next(&mut self) -> Option<View<Transform>> {
+        let link = *self.children.get(self.current)?;
+        self.current += 1;
+        Some(self.view.to_pearl(link).unwrap())
     }
 }

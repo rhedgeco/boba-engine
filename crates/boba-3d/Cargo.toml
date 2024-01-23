@@ -7,5 +7,5 @@ edition = "2021"
 glam = "0.25"
 indexmap = "2.1"
 hashbrown = "0.14"
+extension-trait = "1.0"
 boba-core = { path = "../boba-core" }
-node-tree = { path = "../node-tree" }

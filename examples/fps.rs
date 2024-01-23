@@ -17,7 +17,7 @@ impl Pearl for FpsPrinter {
 }
 
 impl Listener<Update> for FpsPrinter {
-    fn update(mut view: View<'_, Self>, _: &Update) {
+    fn update(view: &mut View<'_, Self>, _: &Update) {
         let Some(past) = view.instant.replace(Instant::now()) else {
             return;
         };
