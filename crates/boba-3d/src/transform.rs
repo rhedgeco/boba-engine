@@ -173,12 +173,6 @@ impl Transform {
 
 #[extension_trait]
 impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
-    fn recalculate_local_matrix(&mut self) {
-        self.local_matrix =
-            Mat4::from_scale_rotation_translation(self.local_scale, self.local_rot, self.local_pos);
-        self.sync_transforms();
-    }
-
     fn set_parent_no_sync(&mut self, parent_option: Option<Link<Transform>>) -> bool {
         // early return if the parent is Some and doesnt exist
         if parent_option.is_some_and(|parent| !self.world_contains(parent)) {
@@ -255,7 +249,7 @@ pub impl<'a> TransformView<'a> for View<'a, Transform> {
         }
 
         self.local_pos = pos;
-        self.recalculate_local_matrix();
+        self.sync_transforms();
     }
 
     fn set_local_rot(&mut self, rot: Quat) {
@@ -264,7 +258,7 @@ pub impl<'a> TransformView<'a> for View<'a, Transform> {
         }
 
         self.local_rot = rot;
-        self.recalculate_local_matrix();
+        self.sync_transforms();
     }
 
     fn set_local_scale(&mut self, scale: Vec3) {
@@ -273,11 +267,13 @@ pub impl<'a> TransformView<'a> for View<'a, Transform> {
         }
 
         self.local_scale = scale;
-        self.recalculate_local_matrix();
+        self.sync_transforms();
     }
 
     fn sync_transforms(&mut self) {
         self.pending_sync = false;
+        self.local_matrix =
+            Mat4::from_scale_rotation_translation(self.local_scale, self.local_rot, self.local_pos);
         let local_matrix = self.local_matrix;
         let world_matrix = match self.parent() {
             Some(parent) => parent.world_matrix * local_matrix,
