@@ -34,7 +34,7 @@ impl Pearl for TransformRotator {
         source.listen::<Update>();
     }
 
-    fn on_insert(view: &mut View<'_, Self>, _: Link<Self>) {
+    fn on_insert(_: Link<Self>, view: &mut View<'_, Self>) {
         let rotation = view.current;
         let mut transform = view.view(view.transform).unwrap();
         transform.set_local_rot(Quat::from_rotation_z(rotation.to_radians()))

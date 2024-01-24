@@ -197,7 +197,7 @@ impl World {
         };
 
         let mut view = self.view(link).unwrap();
-        P::on_insert(&mut view, link);
+        P::on_insert(link, &mut view);
         f(&mut view);
         link
     }

@@ -44,9 +44,9 @@ impl Default for Transform {
 }
 
 impl Pearl for Transform {
-    fn on_insert(view: &mut View<'_, Self>, link: Link<Self>) {
-        view.link = link;
+    fn on_insert(link: Link<Self>, view: &mut View<'_, Self>) {
         view.pending_sync = false;
+        view.link = link;
     }
 
     fn on_remove(mut pearl: Removed<Self>, world: &mut World) {
