@@ -17,7 +17,7 @@ use crate::{
 
 use self::sealed::EventMap;
 
-use super::maps::AnyPearlMap;
+use super::{maps::AnyPearlMap, view::ViewWalker};
 
 type MapHandle = handle_map::Handle<Box<dyn AnyPearlMap>>;
 type PearlHandle<P> = handle_map::Handle<P>;
@@ -137,6 +137,14 @@ impl World {
         Some(anymap.as_map_mut::<P>().iter_mut())
     }
 
+    pub fn view<P: Pearl>(&mut self, link: Link<P>) -> Option<View<P>> {
+        View::new(self, link)
+    }
+
+    pub fn view_walk<P: Pearl>(&mut self) -> Option<ViewWalker<P>> {
+        ViewWalker::new(self)
+    }
+
     pub fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
         let anymap = self.pearl_maps.get_data_mut(link.map_handle)?;
         let map = anymap.as_map_mut::<P>();
@@ -188,8 +196,7 @@ impl World {
             }
         };
 
-        let pearl_ptr = self.get(link).unwrap() as *const P as *mut P;
-        let mut view = unsafe { View::new(self, pearl_ptr) };
+        let mut view = self.view(link).unwrap();
         P::on_insert(&mut view, link);
         f(&mut view);
         link
@@ -229,7 +236,7 @@ impl World {
 mod sealed {
     use log::info;
 
-    use crate::{pearl::Listener, world::View};
+    use crate::pearl::Listener;
 
     use super::*;
 
@@ -244,13 +251,11 @@ mod sealed {
             std::any::type_name::<P>()
         );
 
-        let Some(pearls) = world.iter::<P>() else {
+        let Some(mut view_walker) = world.view_walk::<P>() else {
             return;
         };
 
-        for pearl in pearls {
-            let pearl_ptr = pearl as *const P as *mut P;
-            let mut view = unsafe { View::new(world, pearl_ptr) };
+        while let Some(mut view) = view_walker.walk_next() {
             P::update(&mut view, data)
         }
     }

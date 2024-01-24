@@ -181,7 +181,7 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
 
     fn set_parent_no_sync(&mut self, parent_option: Option<Link<Transform>>) -> bool {
         // early return if the parent is Some and doesnt exist
-        if parent_option.is_some_and(|parent| !self.world().contains(parent)) {
+        if parent_option.is_some_and(|parent| !self.world_contains(parent)) {
             return false;
         }
 
@@ -191,7 +191,7 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
         // if the old parent existed, remove the child from its children list
         let current_link = self.link;
         if let Some(old_parent_link) = old_parent_option {
-            let mut old_parent = self.to_pearl(old_parent_link).unwrap();
+            let mut old_parent = self.view(old_parent_link).unwrap();
             old_parent.children.remove(&current_link);
         };
 
@@ -201,7 +201,7 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
         };
 
         // add the child to the new parents children list
-        let mut parent = self.to_pearl(parent_link).unwrap();
+        let mut parent = self.view(parent_link).unwrap();
         parent.children.insert(current_link);
 
         // resolve recusrive tree branches by walking up each parent
@@ -218,7 +218,7 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
                 None => (),
                 // if next parent is not the source node, recurse up and check the next parent in the chain
                 Some(next_parent_link) if next_parent_link != source => {
-                    let mut next_parent = parent.to_pearl(next_parent_link).unwrap();
+                    let mut next_parent = parent.view(next_parent_link).unwrap();
                     resolve_recursive(&mut next_parent, source, old_parent_option)
                 }
                 // if a recursive loop was found, remove the recursive child from the source node
@@ -227,10 +227,10 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
                 Some(next_parent_link) => {
                     let parent_link = parent.link;
                     parent.parent = old_parent_option;
-                    let mut next_parent = parent.to_pearl(next_parent_link).unwrap();
+                    let mut next_parent = parent.view(next_parent_link).unwrap();
                     next_parent.children.remove(&parent_link);
                     if let Some(old_parent_link) = old_parent_option {
-                        let mut old_parent = next_parent.to_pearl(old_parent_link).unwrap();
+                        let mut old_parent = next_parent.view(old_parent_link).unwrap();
                         old_parent.children.insert(parent_link);
                     }
                 }
@@ -242,7 +242,7 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
 #[extension_trait]
 pub impl<'a> TransformView<'a> for View<'a, Transform> {
     fn parent(&mut self) -> Option<View<Transform>> {
-        Some(self.to_pearl(self.parent?).unwrap())
+        Some(self.view(self.parent?).unwrap())
     }
 
     fn walk_children(&mut self) -> ChildWalker<'_, 'a> {
@@ -277,10 +277,6 @@ pub impl<'a> TransformView<'a> for View<'a, Transform> {
     }
 
     fn sync_transforms(&mut self) {
-        if !self.pending_sync {
-            return;
-        }
-
         self.pending_sync = false;
         let local_matrix = self.local_matrix;
         let world_matrix = match self.parent() {
@@ -336,6 +332,6 @@ impl<'a, 'source> ChildWalker<'a, 'source> {
     pub fn walk_next(&mut self) -> Option<View<Transform>> {
         let link = *self.children.get(self.current)?;
         self.current += 1;
-        Some(self.view.to_pearl(link).unwrap())
+        Some(self.view.view(link).unwrap())
     }
 }
