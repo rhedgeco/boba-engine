@@ -7,5 +7,5 @@ pub mod prelude {
         Pearl, World,
     };
 
-    pub use boba_3d::{glam::*, Transform};
+    pub use boba_3d::{glam::*, transform::TransformView, Transform};
 }
