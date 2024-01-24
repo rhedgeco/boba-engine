@@ -1,6 +1,6 @@
 use boba_core::{
-    world::{Link, Removed, View},
-    Pearl, World,
+    world::{view::DropContext, InsertContext, Link, RemoveContext, View},
+    Pearl,
 };
 use extension_trait::extension_trait;
 use glam::{Mat4, Quat, Vec3};
@@ -44,29 +44,30 @@ impl Default for Transform {
 }
 
 impl Pearl for Transform {
-    fn on_insert(link: Link<Self>, view: &mut View<'_, Self>) {
-        view.pending_sync = false;
-        view.link = link;
+    fn on_insert(context: InsertContext<Self>) {
+        context.view.pending_sync = false;
+        context.view.link = context.link;
     }
 
-    fn on_remove(mut pearl: Removed<Self>, world: &mut World) {
+    fn on_remove(context: RemoveContext<Self>) {
         // remove the parent
-        let parent_option = pearl.parent.take();
+        let parent_option = context.pearl.parent.take();
 
         // remove the pearl from its parents children list
         if let Some(parent) = parent_option {
-            world.get_mut(parent).unwrap().children.remove(&pearl.link);
+            let parent = context.world.get_mut(parent).unwrap();
+            parent.children.remove(&context.pearl.link);
         }
 
         // remove the pearl from its childrens parent slot
-        for child in pearl.children.drain(..) {
-            world.get_mut(child).unwrap().parent = parent_option;
+        for child in context.pearl.children.drain(..) {
+            context.world.get_mut(child).unwrap().parent = parent_option;
         }
     }
 
-    fn on_view_drop(view: &mut View<Self>) {
-        if view.pending_sync {
-            view.sync_transforms();
+    fn on_view_drop(context: DropContext<Self>) {
+        if context.view.pending_sync {
+            context.view.sync_transforms();
         }
     }
 }

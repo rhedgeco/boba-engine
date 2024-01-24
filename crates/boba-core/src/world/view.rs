@@ -37,6 +37,11 @@ impl<'a, P: Pearl> ViewWalker<'a, P> {
     }
 }
 
+pub struct DropContext<'a, 'view, P: Pearl> {
+    pub view: &'a mut View<'view, P>,
+    _private: (),
+}
+
 /// A view into a single [`Pearl`](crate::Pearl) in a [`World`]
 pub struct View<'a, P: Pearl> {
     pearl: &'a mut P,
@@ -59,7 +64,10 @@ impl<P: Pearl> Deref for View<'_, P> {
 
 impl<P: Pearl> Drop for View<'_, P> {
     fn drop(&mut self) {
-        P::on_view_drop(self);
+        P::on_view_drop(DropContext {
+            view: self,
+            _private: (),
+        });
     }
 }
 

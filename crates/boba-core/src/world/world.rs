@@ -1,7 +1,6 @@
 use std::{
     any::{Any, TypeId},
     hash::Hash,
-    ops::{Deref, DerefMut},
     slice::{Iter, IterMut},
 };
 
@@ -69,20 +68,16 @@ impl<P> Link<P> {
     }
 }
 
-pub struct Removed<'a, P>(&'a mut P);
-
-impl<'a, P> DerefMut for Removed<'a, P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0
-    }
+pub struct RemoveContext<'a, P> {
+    pub world: &'a mut World,
+    pub pearl: &'a mut P,
+    _private: (),
 }
 
-impl<'a, P> Deref for Removed<'a, P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
+pub struct InsertContext<'a, 'view, P: Pearl> {
+    pub view: &'a mut View<'view, P>,
+    pub link: Link<P>,
+    _private: (),
 }
 
 struct PearlData {
@@ -163,7 +158,11 @@ impl World {
             remover(self);
         }
 
-        P::on_remove(Removed(&mut pearl), self);
+        P::on_remove(RemoveContext {
+            world: self,
+            pearl: &mut pearl,
+            _private: (),
+        });
         Some(pearl)
     }
 
@@ -197,7 +196,11 @@ impl World {
         };
 
         let mut view = self.view(link).unwrap();
-        P::on_insert(link, &mut view);
+        P::on_insert(InsertContext {
+            view: &mut view,
+            link,
+            _private: (),
+        });
         f(&mut view);
         link
     }

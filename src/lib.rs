@@ -3,7 +3,7 @@ pub use boba_core as core;
 pub mod prelude {
     pub use boba_core::{
         pearl::{Event, EventSource, Listener, SimpleEvent},
-        world::{Link, Removed, View},
+        world::{InsertContext, Link, RemoveContext, View},
         Pearl, World,
     };
 
