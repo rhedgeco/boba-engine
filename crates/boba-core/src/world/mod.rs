@@ -1,7 +1,4 @@
-mod maps;
+mod map;
+mod world;
 
-pub mod view;
-pub mod world;
-
-pub use view::{View, ViewWalker};
 pub use world::*;

@@ -1,29 +1,27 @@
 use std::{
     any::{Any, TypeId},
     hash::Hash,
-    slice::{Iter, IterMut},
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
 };
 
 use handle_map::{map::SparseHandleMap, Handle};
 use hashbrown::HashMap;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use crate::{
     pearl::{Event, SimpleEvent},
-    world::{maps::PearlMap, View},
+    world::map::WorldMap,
     Pearl,
 };
 
-use self::sealed::EventMap;
+use super::map::{self, AnyMap};
 
-use super::{maps::AnyPearlMap, view::ViewWalker};
-
-type MapHandle = handle_map::Handle<Box<dyn AnyPearlMap>>;
-type PearlHandle<P> = handle_map::Handle<P>;
+type AnyMapBox = Box<dyn AnyMap>;
 
 pub struct Link<P> {
-    map_handle: MapHandle,
-    pearl_handle: PearlHandle<P>,
+    map_handle: Handle<AnyMapBox>,
+    data_handle: Handle<P>,
 }
 
 impl<P> Copy for Link<P> {}
@@ -31,7 +29,7 @@ impl<P> Clone for Link<P> {
     fn clone(&self) -> Self {
         Self {
             map_handle: self.map_handle.clone(),
-            pearl_handle: self.pearl_handle.clone(),
+            data_handle: self.data_handle.clone(),
         }
     }
 }
@@ -39,31 +37,31 @@ impl<P> Clone for Link<P> {
 impl<P> Hash for Link<P> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.map_handle.hash(state);
-        self.pearl_handle.hash(state);
+        self.data_handle.hash(state);
     }
 }
 
 impl<P> Eq for Link<P> {}
 impl<P> PartialEq for Link<P> {
     fn eq(&self, other: &Self) -> bool {
-        self.map_handle == other.map_handle && self.pearl_handle == other.pearl_handle
+        self.map_handle == other.map_handle && self.data_handle == other.data_handle
     }
 }
 
 impl<P> Link<P> {
     #[doc(hidden)]
-    pub fn from_raw(map: u64, pearl: u64) -> Self {
+    pub fn from_raw(map: u64, data: u64) -> Self {
         Self {
             map_handle: Handle::from_raw(map),
-            pearl_handle: Handle::from_raw(pearl),
+            data_handle: Handle::from_raw(data),
         }
     }
 
     #[doc(hidden)]
-    pub fn into_type<T>(self) -> Link<T> {
+    pub fn into_type<P2>(self) -> Link<P2> {
         Link {
             map_handle: self.map_handle,
-            pearl_handle: self.pearl_handle.into_type(),
+            data_handle: self.data_handle.into_type(),
         }
     }
 }
@@ -80,13 +78,21 @@ pub struct InsertContext<'a, 'view, P: Pearl> {
     _private: (),
 }
 
+pub struct DropContext<'a, 'view, P: Pearl> {
+    pub view: &'a mut View<'view, P>,
+    _private: (),
+}
+
+pub type Iter<'a, P> = map::Iter<'a, P>;
+pub type IterMut<'a, P> = map::IterMut<'a, P>;
+
 struct PearlData {
-    map_handle: MapHandle,
+    map_handle: Handle<AnyMapBox>,
     on_remove: Vec<fn(&mut World)>,
 }
 
 impl PearlData {
-    pub fn new(map_handle: MapHandle) -> Self {
+    pub fn new(map_handle: Handle<AnyMapBox>) -> Self {
         Self {
             map_handle,
             on_remove: Vec::new(),
@@ -96,8 +102,8 @@ impl PearlData {
 
 #[derive(Default)]
 pub struct World {
-    pearl_data: HashMap<TypeId, PearlData>,
-    pearl_maps: SparseHandleMap<Box<dyn AnyPearlMap>>,
+    pearl_data: IndexMap<TypeId, PearlData>,
+    pearl_maps: SparseHandleMap<AnyMapBox>,
     event_runners: HashMap<TypeId, Box<dyn Any>>,
 }
 
@@ -106,103 +112,120 @@ impl World {
         Self::default()
     }
 
-    pub fn contains<P: 'static>(&self, link: Link<P>) -> bool {
-        self.get(link).is_some()
+    pub fn count<P: Pearl>(&self) -> usize {
+        match self.get_map::<P>() {
+            Some(map) => map.len(),
+            None => 0,
+        }
     }
 
-    pub fn get<P: 'static>(&self, link: Link<P>) -> Option<&P> {
-        let anymap = self.pearl_maps.get_data(link.map_handle)?;
-        anymap.as_map::<P>().get_data(link.pearl_handle)
+    pub fn has_type<P: Pearl>(&self) -> bool {
+        self.pearl_data.get(&TypeId::of::<P>()).is_some()
     }
 
-    pub fn get_mut<P: 'static>(&mut self, link: Link<P>) -> Option<&mut P> {
-        let anymap = self.pearl_maps.get_data_mut(link.map_handle)?;
-        anymap.as_map_mut::<P>().get_data_mut(link.pearl_handle)
+    pub fn contains<P: Pearl>(&self, link: Link<P>) -> bool {
+        let Some(map) = self.get_map_with(link.map_handle) else {
+            return false;
+        };
+
+        map.contains(link.data_handle)
     }
 
-    pub fn iter<P: 'static>(&self) -> Option<Iter<P>> {
-        let data = self.pearl_data.get(&TypeId::of::<P>())?;
-        let anymap = self.pearl_maps.get_data(data.map_handle).unwrap();
-        Some(anymap.as_map::<P>().iter())
+    pub fn get<P: Pearl>(&self, link: Link<P>) -> Option<&P> {
+        self.get_map_with(link.map_handle)?.get(link.data_handle)
     }
 
-    pub fn iter_mut<P: 'static>(&mut self) -> Option<IterMut<P>> {
-        let data = self.pearl_data.get(&TypeId::of::<P>())?;
-        let anymap = self.pearl_maps.get_data_mut(data.map_handle).unwrap();
-        Some(anymap.as_map_mut::<P>().iter_mut())
+    pub fn get_mut<P: Pearl>(&mut self, link: Link<P>) -> Option<&mut P> {
+        self.get_map_with_mut(link.map_handle)?
+            .get_mut(link.data_handle)
     }
 
-    pub fn view<P: Pearl>(&mut self, link: Link<P>) -> Option<View<P>> {
-        View::new(self, link)
+    pub fn iter<P: Pearl>(&self) -> Iter<P> {
+        match self.get_map::<P>() {
+            Some(map) => map.iter(),
+            None => Iter::empty(),
+        }
     }
 
-    pub fn view_walk<P: Pearl>(&mut self) -> Option<ViewWalker<P>> {
+    pub fn iter_mut<P: Pearl>(&mut self) -> IterMut<P> {
+        match self.get_map_mut::<P>() {
+            Some(map) => map.iter_mut(),
+            None => IterMut::empty(),
+        }
+    }
+
+    pub fn view_walker<P: Pearl>(&mut self) -> Option<ViewWalker<P>> {
         ViewWalker::new(self)
     }
 
-    pub fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
-        let anymap = self.pearl_maps.get_data_mut(link.map_handle)?;
-        let map = anymap.as_map_mut::<P>();
-        let mut pearl = map.remove(link.pearl_handle)?;
-
-        // early return if map is not empty
-        if !map.is_empty() {
-            return Some(pearl);
-        }
-
-        // remove map and run all event removers
-        let pearl_id = TypeId::of::<P>();
-        self.pearl_maps.remove(link.map_handle);
-        let pearl_data = self.pearl_data.remove(&pearl_id).unwrap();
-        for remover in pearl_data.on_remove.iter() {
-            remover(self);
-        }
-
-        P::on_remove(RemoveContext {
-            world: self,
-            pearl: &mut pearl,
-            _private: (),
-        });
-        Some(pearl)
+    pub fn insert<P: Pearl>(&mut self, data: P) -> Link<P> {
+        self.insert_and(data, |_| {})
     }
 
-    pub fn insert<P: Pearl>(&mut self, pearl: P) -> Link<P> {
-        self.insert_and(pearl, |_| {})
-    }
-
-    pub fn insert_and<P: Pearl>(&mut self, pearl: P, f: impl FnOnce(&mut View<P>)) -> Link<P> {
-        use hashbrown::hash_map::Entry as E;
-        let link = match self.pearl_data.entry(TypeId::of::<P>()) {
+    pub fn insert_and<P: Pearl>(&mut self, data: P, f: impl FnOnce(&mut View<P>)) -> Link<P> {
+        use indexmap::map::Entry as E;
+        let (map_handle, data_handle, data_index) = match self.pearl_data.entry(TypeId::of::<P>()) {
             E::Occupied(e) => {
                 let map_handle = e.get().map_handle;
-                let map = self.pearl_maps[map_handle].as_map_mut::<P>();
-                let pearl_handle = map.insert(pearl);
-                Link {
-                    map_handle,
-                    pearl_handle,
-                }
+                let map = self.pearl_maps[map_handle].as_map_mut::<P>().unwrap();
+                let data_handle = map.insert(data);
+                let data_index = map.index_of(data_handle).unwrap();
+                (map_handle, data_handle, data_index)
             }
             E::Vacant(e) => {
-                let mut map = PearlMap::new();
-                let pearl_handle = map.insert(pearl);
+                let mut map = WorldMap::new();
+                let data_handle = map.insert(data);
+                let data_index = map.index_of(data_handle).unwrap();
                 let map_handle = self.pearl_maps.insert(Box::new(map));
                 e.insert(PearlData::new(map_handle));
                 P::register(self);
-                Link {
-                    map_handle,
-                    pearl_handle,
-                }
+                (map_handle, data_handle, data_index)
             }
         };
 
-        let mut view = self.view(link).unwrap();
+        let mut destroy_queue = IndexSet::new();
+        let mut view = View::<P> {
+            world: self,
+            destroy_queue: &mut destroy_queue,
+            map_handle,
+            data_index,
+            _type: PhantomData,
+        };
+        let link = Link {
+            map_handle,
+            data_handle,
+        };
         P::on_insert(InsertContext {
             view: &mut view,
             link,
             _private: (),
         });
+
+        // call insert_and function
         f(&mut view);
+        drop(view);
+
+        // destroy any links in the queue
+        for link in destroy_queue.iter() {
+            if let Some(map) = self.pearl_maps.get_data_mut(link.map_handle) {
+                map.destroy(link.data_handle)
+            }
+        }
+
         link
+    }
+
+    pub fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
+        let map = self.get_map_with_mut(link.map_handle)?;
+        let data = map.remove(link.data_handle)?;
+
+        // if map was emptied, remove its data from the world
+        if map.is_empty() {
+            self.pearl_data.remove(&TypeId::of::<P>()).unwrap();
+            self.pearl_maps.remove(link.map_handle).unwrap();
+        }
+
+        Some(data)
     }
 
     pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &E) {
@@ -215,7 +238,7 @@ impl World {
             return;
         };
 
-        let event_map = anymap.downcast_ref::<EventMap<E>>().unwrap();
+        let event_map = anymap.downcast_ref::<sealed::EventMap<E>>().unwrap();
         for runner in event_map.values() {
             runner(self, event);
         }
@@ -227,41 +250,182 @@ impl World {
             }
             Entry::Occupied(e) => {
                 e.into_mut()
-                    .downcast_mut::<EventMap<E>>()
+                    .downcast_mut::<sealed::EventMap<E>>()
                     .unwrap()
                     .extend(event_map);
             }
         }
     }
+
+    fn get_map<P: Pearl>(&self) -> Option<&WorldMap<P>> {
+        let map_handle = self.pearl_data.get(&TypeId::of::<P>())?.map_handle;
+        let anymap = self.pearl_maps.get_data(map_handle).unwrap();
+        Some(anymap.as_map::<P>().unwrap())
+    }
+
+    fn get_map_mut<P: Pearl>(&mut self) -> Option<&mut WorldMap<P>> {
+        let map_handle = self.pearl_data.get(&TypeId::of::<P>())?.map_handle;
+        let anymap = self.pearl_maps.get_data_mut(map_handle).unwrap();
+        Some(anymap.as_map_mut::<P>().unwrap())
+    }
+
+    fn get_map_with<P: Pearl>(&self, handle: Handle<AnyMapBox>) -> Option<&WorldMap<P>> {
+        self.pearl_maps.get_data(handle)?.as_map::<P>()
+    }
+
+    fn get_map_with_mut<P: Pearl>(
+        &mut self,
+        handle: Handle<AnyMapBox>,
+    ) -> Option<&mut WorldMap<P>> {
+        self.pearl_maps.get_data_mut(handle)?.as_map_mut::<P>()
+    }
 }
 
-// seal event source implementation so it cannot be called manually
+pub struct ViewWalker<'a, P> {
+    world: &'a mut World,
+    destroy_queue: IndexSet<Link<()>>,
+    map_handle: Handle<AnyMapBox>,
+    data_index: usize,
+    data_cap: usize,
+
+    _type: PhantomData<*const P>,
+}
+
+impl<'a, P> Drop for ViewWalker<'a, P> {
+    fn drop(&mut self) {
+        // destroy all pending links
+        for link in self.destroy_queue.iter() {
+            if let Some(map) = self.world.pearl_maps.get_data_mut(link.map_handle) {
+                map.destroy(link.data_handle)
+            }
+        }
+    }
+}
+
+impl<'a, P: Pearl> ViewWalker<'a, P> {
+    pub fn new(world: &'a mut World) -> Option<Self> {
+        let map_handle = world.pearl_data.get(&TypeId::of::<P>())?.map_handle;
+        let data_cap = world.get_map_with::<P>(map_handle).unwrap().len();
+        Some(Self {
+            world,
+            destroy_queue: IndexSet::new(),
+            map_handle,
+            data_index: 0,
+            data_cap,
+            _type: PhantomData,
+        })
+    }
+
+    pub fn next(&mut self) -> Option<View<P>> {
+        if self.data_index == self.data_cap {
+            return None;
+        }
+
+        let data_index = self.data_index;
+        self.data_index += 1;
+        Some(View {
+            world: self.world,
+            destroy_queue: &mut self.destroy_queue,
+            map_handle: self.map_handle,
+            data_index,
+            _type: PhantomData,
+        })
+    }
+}
+
+pub struct View<'a, P: Pearl> {
+    world: &'a mut World,
+    destroy_queue: &'a mut IndexSet<Link<()>>,
+    map_handle: Handle<AnyMapBox>,
+    data_index: usize,
+
+    _type: PhantomData<*const P>,
+}
+
+impl<'a, P: Pearl> Drop for View<'a, P> {
+    fn drop(&mut self) {
+        P::on_view_drop(DropContext {
+            view: self,
+            _private: (),
+        })
+    }
+}
+
+impl<'a, P: Pearl> DerefMut for View<'a, P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let map = self.world.get_map_with_mut(self.map_handle).unwrap();
+        map.get_index_mut(self.data_index).unwrap().1
+    }
+}
+
+impl<'a, P: Pearl> Deref for View<'a, P> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        let map = self.world.get_map_with(self.map_handle).unwrap();
+        map.get_index(self.data_index).unwrap().1
+    }
+}
+
+impl<'a, P: Pearl> View<'a, P> {
+    pub fn count<P2: Pearl>(&self) -> usize {
+        self.world.count::<P2>()
+    }
+
+    pub fn has_type<P2: Pearl>(&self) -> bool {
+        self.world.has_type::<P2>()
+    }
+
+    pub fn contains<P2: Pearl>(&self, link: Link<P2>) -> bool {
+        self.world.contains(link)
+    }
+
+    pub fn get<P2: Pearl>(&self, link: Link<P2>) -> Option<&P2> {
+        self.world.get(link)
+    }
+
+    pub fn view_other<P2: Pearl>(&mut self, link: Link<P2>) -> Option<View<P2>> {
+        let map = self.world.get_map_with(link.map_handle)?;
+        let data_index = map.index_of(link.data_handle)?;
+        Some(View {
+            world: self.world,
+            destroy_queue: self.destroy_queue,
+            map_handle: link.map_handle,
+            data_index,
+            _type: PhantomData,
+        })
+    }
+
+    pub fn iter<P2: Pearl>(&self) -> Iter<P2> {
+        self.world.iter::<P2>()
+    }
+
+    pub fn iter_mut<P2: Pearl>(&mut self) -> IterMut<P2> {
+        // iterating mutably will not disturb any indices
+        self.world.iter_mut::<P2>()
+    }
+
+    pub fn insert<P2: Pearl>(&mut self, data: P2) -> Link<P2> {
+        // inserting does not disturb any indices
+        self.world.insert(data)
+    }
+
+    pub fn destroy<P2: Pearl>(&mut self, link: Link<P2>) -> bool {
+        // check if the link is valid
+        if !self.world.contains(link) {
+            return false;
+        }
+
+        // we have to queue removals because removing data disturbs indices
+        self.destroy_queue.insert(link.into_type())
+    }
+}
+
 mod sealed {
-    use log::info;
-
-    use crate::pearl::Listener;
-
     use super::*;
 
     pub type EventFn<E> = for<'a> fn(&mut World, &<E as Event>::Data<'a>);
     pub type EventMap<E> = IndexMap<TypeId, EventFn<E>>;
-
-    /// the function to be called when an event is run on a world
-    fn event_runner<'a, E: Event, P: Pearl + Listener<E>>(world: &mut World, data: &E::Data<'a>) {
-        info!(
-            "Running `{}` event for all '{}' pearls",
-            std::any::type_name::<E>(),
-            std::any::type_name::<P>()
-        );
-
-        let Some(mut view_walker) = world.view_walk::<P>() else {
-            return;
-        };
-
-        while let Some(mut view) = view_walker.walk_next() {
-            P::update(&mut view, data)
-        }
-    }
 
     /// the function to be called when pearls are removed from a world
     fn event_remover<E: Event, P: Pearl>(world: &mut World) {
@@ -270,8 +434,28 @@ mod sealed {
         map.remove(&TypeId::of::<P>());
     }
 
+    /// the function to be called when an event is run on a world
+    fn event_runner<'a, E: Event, P: Pearl + crate::pearl::Listener<E>>(
+        world: &mut World,
+        data: &E::Data<'a>,
+    ) {
+        log::info!(
+            "Running `{}` event for all '{}' pearls",
+            std::any::type_name::<E>(),
+            std::any::type_name::<P>()
+        );
+
+        let Some(mut view_walker) = world.view_walker::<P>() else {
+            return;
+        };
+
+        while let Some(mut view) = view_walker.next() {
+            P::update(&mut view, data)
+        }
+    }
+
     impl<P: Pearl> crate::pearl::EventSource<P> for World {
-        fn listen<E: crate::pearl::Event>(&mut self)
+        fn listen<E: Event>(&mut self)
         where
             P: crate::pearl::Listener<E>,
         {

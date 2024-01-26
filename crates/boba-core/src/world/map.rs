@@ -9,12 +9,12 @@ pub trait AnyMap: Any {
 }
 
 impl dyn AnyMap {
-    pub fn as_map<T: 'static>(&self) -> Option<&ArenaMap<T>> {
-        self.as_any().downcast_ref::<ArenaMap<T>>()
+    pub fn as_map<T: 'static>(&self) -> Option<&WorldMap<T>> {
+        self.as_any().downcast_ref::<WorldMap<T>>()
     }
 
-    pub fn as_map_mut<T: 'static>(&mut self) -> Option<&mut ArenaMap<T>> {
-        self.as_any_mut().downcast_mut::<ArenaMap<T>>()
+    pub fn as_map_mut<T: 'static>(&mut self) -> Option<&mut WorldMap<T>> {
+        self.as_any_mut().downcast_mut::<WorldMap<T>>()
     }
 }
 
@@ -23,12 +23,12 @@ struct DataEntry<T> {
     data: T,
 }
 
-pub struct ArenaMap<T> {
+pub struct WorldMap<T> {
     indexer: SparseHandleMap<usize>,
     data: Vec<DataEntry<T>>,
 }
 
-impl<T> Default for ArenaMap<T> {
+impl<T> Default for WorldMap<T> {
     fn default() -> Self {
         Self {
             indexer: Default::default(),
@@ -37,7 +37,7 @@ impl<T> Default for ArenaMap<T> {
     }
 }
 
-impl<T: 'static> AnyMap for ArenaMap<T> {
+impl<T: 'static> AnyMap for WorldMap<T> {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -51,7 +51,7 @@ impl<T: 'static> AnyMap for ArenaMap<T> {
     }
 }
 
-impl<T> ArenaMap<T> {
+impl<T> WorldMap<T> {
     pub fn new() -> Self {
         Self::default()
     }
