@@ -7,7 +7,7 @@ use std::{
 
 use handle_map::{map::SparseHandleMap, Handle};
 use hashbrown::HashMap;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 
 use crate::{
     pearl::{Event, SimpleEvent},
@@ -69,6 +69,7 @@ impl<P> Link<P> {
 pub struct RemoveContext<'a, P> {
     pub world: &'a mut World,
     pub pearl: &'a mut P,
+    pub old_link: Link<P>,
     _private: (),
 }
 
@@ -183,10 +184,10 @@ impl World {
             }
         };
 
-        let mut destroy_queue = IndexSet::new();
+        let mut mod_queue = IndexMap::new();
         let mut view = View::<P> {
             world: self,
-            destroy_queue: &mut destroy_queue,
+            mod_queue: &mut mod_queue,
             map_handle,
             data_index,
             _type: PhantomData,
@@ -205,11 +206,9 @@ impl World {
         f(&mut view);
         drop(view);
 
-        // destroy any links in the queue
-        for link in destroy_queue.iter() {
-            if let Some(map) = self.pearl_maps.get_data_mut(link.map_handle) {
-                map.destroy(link.data_handle)
-            }
+        // run all pending mod functions
+        for (link, func) in mod_queue.iter() {
+            func(*link, self);
         }
 
         link
@@ -217,13 +216,20 @@ impl World {
 
     pub fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
         let map = self.get_map_with_mut(link.map_handle)?;
-        let data = map.remove(link.data_handle)?;
+        let mut data = map.remove(link.data_handle)?;
 
         // if map was emptied, remove its data from the world
         if map.is_empty() {
             self.pearl_data.remove(&TypeId::of::<P>()).unwrap();
             self.pearl_maps.remove(link.map_handle).unwrap();
         }
+
+        P::on_remove(RemoveContext {
+            world: self,
+            pearl: &mut data,
+            old_link: link,
+            _private: (),
+        });
 
         Some(data)
     }
@@ -283,7 +289,7 @@ impl World {
 
 pub struct ViewWalker<'a, P> {
     world: &'a mut World,
-    destroy_queue: IndexSet<Link<()>>,
+    mod_queue: IndexMap<Link<()>, fn(Link<()>, &mut World)>,
     map_handle: Handle<AnyMapBox>,
     data_index: usize,
     data_cap: usize,
@@ -293,11 +299,9 @@ pub struct ViewWalker<'a, P> {
 
 impl<'a, P> Drop for ViewWalker<'a, P> {
     fn drop(&mut self) {
-        // destroy all pending links
-        for link in self.destroy_queue.iter() {
-            if let Some(map) = self.world.pearl_maps.get_data_mut(link.map_handle) {
-                map.destroy(link.data_handle)
-            }
+        // run all pending mod functions
+        for (link, func) in self.mod_queue.iter() {
+            func(*link, self.world);
         }
     }
 }
@@ -308,7 +312,7 @@ impl<'a, P: Pearl> ViewWalker<'a, P> {
         let data_cap = world.get_map_with::<P>(map_handle).unwrap().len();
         Some(Self {
             world,
-            destroy_queue: IndexSet::new(),
+            mod_queue: IndexMap::new(),
             map_handle,
             data_index: 0,
             data_cap,
@@ -325,7 +329,7 @@ impl<'a, P: Pearl> ViewWalker<'a, P> {
         self.data_index += 1;
         Some(View {
             world: self.world,
-            destroy_queue: &mut self.destroy_queue,
+            mod_queue: &mut self.mod_queue,
             map_handle: self.map_handle,
             data_index,
             _type: PhantomData,
@@ -335,7 +339,7 @@ impl<'a, P: Pearl> ViewWalker<'a, P> {
 
 pub struct View<'a, P: Pearl> {
     world: &'a mut World,
-    destroy_queue: &'a mut IndexSet<Link<()>>,
+    mod_queue: &'a mut IndexMap<Link<()>, fn(Link<()>, &mut World)>,
     map_handle: Handle<AnyMapBox>,
     data_index: usize,
 
@@ -368,6 +372,15 @@ impl<'a, P: Pearl> Deref for View<'a, P> {
 }
 
 impl<'a, P: Pearl> View<'a, P> {
+    pub fn current_link(&self) -> Link<P> {
+        let map = self.world.get_map_with(self.map_handle).unwrap();
+        let data_handle = map.get_index(self.data_index).unwrap().0;
+        Link {
+            map_handle: self.map_handle,
+            data_handle,
+        }
+    }
+
     pub fn count<P2: Pearl>(&self) -> usize {
         self.world.count::<P2>()
     }
@@ -389,7 +402,7 @@ impl<'a, P: Pearl> View<'a, P> {
         let data_index = map.index_of(link.data_handle)?;
         Some(View {
             world: self.world,
-            destroy_queue: self.destroy_queue,
+            mod_queue: self.mod_queue,
             map_handle: link.map_handle,
             data_index,
             _type: PhantomData,
@@ -417,10 +430,15 @@ impl<'a, P: Pearl> View<'a, P> {
         }
 
         // we have to queue removals because removing data disturbs indices
-        self.destroy_queue.insert(link.into_type())
+        self.mod_queue
+            .insert(link.into_type(), |link, world| {
+                world.remove(link.into_type::<P2>());
+            })
+            .is_none()
     }
 }
 
+// seal event source implementation so it cannot be called externally
 mod sealed {
     use super::*;
 

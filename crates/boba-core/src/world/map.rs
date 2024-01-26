@@ -5,7 +5,6 @@ use handle_map::{map::SparseHandleMap, Handle};
 pub trait AnyMap: Any {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
-    fn destroy(&mut self, handle: Handle<()>);
 }
 
 impl dyn AnyMap {
@@ -28,15 +27,6 @@ pub struct WorldMap<T> {
     data: Vec<DataEntry<T>>,
 }
 
-impl<T> Default for WorldMap<T> {
-    fn default() -> Self {
-        Self {
-            indexer: Default::default(),
-            data: Default::default(),
-        }
-    }
-}
-
 impl<T: 'static> AnyMap for WorldMap<T> {
     fn as_any(&self) -> &dyn Any {
         self
@@ -45,9 +35,14 @@ impl<T: 'static> AnyMap for WorldMap<T> {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+}
 
-    fn destroy(&mut self, handle: Handle<()>) {
-        self.remove(handle.into_type());
+impl<T> Default for WorldMap<T> {
+    fn default() -> Self {
+        Self {
+            indexer: Default::default(),
+            data: Default::default(),
+        }
     }
 }
 
