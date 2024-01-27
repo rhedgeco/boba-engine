@@ -1,8 +1,6 @@
 use std::{
     any::{Any, TypeId},
     hash::Hash,
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
 };
 
 use handle_map::{map::SparseHandleMap, Handle};
@@ -11,17 +9,20 @@ use indexmap::IndexMap;
 
 use crate::{
     pearl::{Event, SimpleEvent},
-    world::map::WorldMap,
+    world::{map::WorldMap, view::DestroyQueue},
     Pearl,
 };
 
-use super::map::{self, AnyMap};
+use super::{
+    map::{self, AnyMap},
+    view::{View, Walker},
+};
 
-type AnyMapBox = Box<dyn AnyMap>;
+pub(super) type AnyMapBox = Box<dyn AnyMap>;
 
 pub struct Link<P> {
-    map_handle: Handle<AnyMapBox>,
-    data_handle: Handle<P>,
+    pub(super) map_handle: Handle<AnyMapBox>,
+    pub(super) data_handle: Handle<P>,
 }
 
 impl<P> Copy for Link<P> {}
@@ -76,11 +77,6 @@ pub struct RemoveContext<'a, P> {
 pub struct InsertContext<'a, 'view, P: Pearl> {
     pub view: &'a mut View<'view, P>,
     pub link: Link<P>,
-    _private: (),
-}
-
-pub struct DropContext<'a, 'view, P: Pearl> {
-    pub view: &'a mut View<'view, P>,
     _private: (),
 }
 
@@ -155,8 +151,8 @@ impl World {
         }
     }
 
-    pub fn view_walker<P: Pearl>(&mut self) -> Option<ViewWalker<P>> {
-        ViewWalker::new(self)
+    pub fn view_walker<P: Pearl>(&mut self) -> Option<Walker<P>> {
+        Walker::new(self)
     }
 
     pub fn insert<P: Pearl>(&mut self, data: P) -> Link<P> {
@@ -184,14 +180,8 @@ impl World {
             }
         };
 
-        let mut mod_queue = IndexMap::new();
-        let mut view = View::<P> {
-            world: self,
-            mod_queue: &mut mod_queue,
-            map_handle,
-            data_index,
-            _type: PhantomData,
-        };
+        let mut destroy_queue = DestroyQueue::new();
+        let mut view = View::<P>::new(self, &mut destroy_queue, map_handle, data_index);
         let link = Link {
             map_handle,
             data_handle,
@@ -206,10 +196,8 @@ impl World {
         f(&mut view);
         drop(view);
 
-        // run all pending mod functions
-        for (link, func) in mod_queue.iter() {
-            func(*link, self);
-        }
+        // run all pending destroy queue
+        destroy_queue.execute_on(self);
 
         link
     }
@@ -263,178 +251,31 @@ impl World {
         }
     }
 
-    fn get_map<P: Pearl>(&self) -> Option<&WorldMap<P>> {
-        let map_handle = self.pearl_data.get(&TypeId::of::<P>())?.map_handle;
+    pub(super) fn get_map_handle<P: Pearl>(&self) -> Option<Handle<AnyMapBox>> {
+        Some(self.pearl_data.get(&TypeId::of::<P>())?.map_handle)
+    }
+
+    pub(super) fn get_map<P: Pearl>(&self) -> Option<&WorldMap<P>> {
+        let map_handle = self.get_map_handle::<P>()?;
         let anymap = self.pearl_maps.get_data(map_handle).unwrap();
         Some(anymap.as_map::<P>().unwrap())
     }
 
-    fn get_map_mut<P: Pearl>(&mut self) -> Option<&mut WorldMap<P>> {
-        let map_handle = self.pearl_data.get(&TypeId::of::<P>())?.map_handle;
+    pub(super) fn get_map_mut<P: Pearl>(&mut self) -> Option<&mut WorldMap<P>> {
+        let map_handle = self.get_map_handle::<P>()?;
         let anymap = self.pearl_maps.get_data_mut(map_handle).unwrap();
         Some(anymap.as_map_mut::<P>().unwrap())
     }
 
-    fn get_map_with<P: Pearl>(&self, handle: Handle<AnyMapBox>) -> Option<&WorldMap<P>> {
+    pub(super) fn get_map_with<P: Pearl>(&self, handle: Handle<AnyMapBox>) -> Option<&WorldMap<P>> {
         self.pearl_maps.get_data(handle)?.as_map::<P>()
     }
 
-    fn get_map_with_mut<P: Pearl>(
+    pub(super) fn get_map_with_mut<P: Pearl>(
         &mut self,
         handle: Handle<AnyMapBox>,
     ) -> Option<&mut WorldMap<P>> {
         self.pearl_maps.get_data_mut(handle)?.as_map_mut::<P>()
-    }
-}
-
-pub struct ViewWalker<'a, P> {
-    world: &'a mut World,
-    mod_queue: IndexMap<Link<()>, fn(Link<()>, &mut World)>,
-    map_handle: Handle<AnyMapBox>,
-    data_index: usize,
-    data_cap: usize,
-
-    _type: PhantomData<*const P>,
-}
-
-impl<'a, P> Drop for ViewWalker<'a, P> {
-    fn drop(&mut self) {
-        // run all pending mod functions
-        for (link, func) in self.mod_queue.iter() {
-            func(*link, self.world);
-        }
-    }
-}
-
-impl<'a, P: Pearl> ViewWalker<'a, P> {
-    pub fn new(world: &'a mut World) -> Option<Self> {
-        let map_handle = world.pearl_data.get(&TypeId::of::<P>())?.map_handle;
-        let data_cap = world.get_map_with::<P>(map_handle).unwrap().len();
-        Some(Self {
-            world,
-            mod_queue: IndexMap::new(),
-            map_handle,
-            data_index: 0,
-            data_cap,
-            _type: PhantomData,
-        })
-    }
-
-    pub fn next(&mut self) -> Option<View<P>> {
-        if self.data_index == self.data_cap {
-            return None;
-        }
-
-        let data_index = self.data_index;
-        self.data_index += 1;
-        Some(View {
-            world: self.world,
-            mod_queue: &mut self.mod_queue,
-            map_handle: self.map_handle,
-            data_index,
-            _type: PhantomData,
-        })
-    }
-}
-
-pub struct View<'a, P: Pearl> {
-    world: &'a mut World,
-    mod_queue: &'a mut IndexMap<Link<()>, fn(Link<()>, &mut World)>,
-    map_handle: Handle<AnyMapBox>,
-    data_index: usize,
-
-    _type: PhantomData<*const P>,
-}
-
-impl<'a, P: Pearl> Drop for View<'a, P> {
-    fn drop(&mut self) {
-        P::on_view_drop(DropContext {
-            view: self,
-            _private: (),
-        })
-    }
-}
-
-impl<'a, P: Pearl> DerefMut for View<'a, P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        let map = self.world.get_map_with_mut(self.map_handle).unwrap();
-        map.get_index_mut(self.data_index).unwrap().1
-    }
-}
-
-impl<'a, P: Pearl> Deref for View<'a, P> {
-    type Target = P;
-
-    fn deref(&self) -> &Self::Target {
-        let map = self.world.get_map_with(self.map_handle).unwrap();
-        map.get_index(self.data_index).unwrap().1
-    }
-}
-
-impl<'a, P: Pearl> View<'a, P> {
-    pub fn current_link(&self) -> Link<P> {
-        let map = self.world.get_map_with(self.map_handle).unwrap();
-        let data_handle = map.get_index(self.data_index).unwrap().0;
-        Link {
-            map_handle: self.map_handle,
-            data_handle,
-        }
-    }
-
-    pub fn count<P2: Pearl>(&self) -> usize {
-        self.world.count::<P2>()
-    }
-
-    pub fn has_type<P2: Pearl>(&self) -> bool {
-        self.world.has_type::<P2>()
-    }
-
-    pub fn contains<P2: Pearl>(&self, link: Link<P2>) -> bool {
-        self.world.contains(link)
-    }
-
-    pub fn get<P2: Pearl>(&self, link: Link<P2>) -> Option<&P2> {
-        self.world.get(link)
-    }
-
-    pub fn view_other<P2: Pearl>(&mut self, link: Link<P2>) -> Option<View<P2>> {
-        let map = self.world.get_map_with(link.map_handle)?;
-        let data_index = map.index_of(link.data_handle)?;
-        Some(View {
-            world: self.world,
-            mod_queue: self.mod_queue,
-            map_handle: link.map_handle,
-            data_index,
-            _type: PhantomData,
-        })
-    }
-
-    pub fn iter<P2: Pearl>(&self) -> Iter<P2> {
-        self.world.iter::<P2>()
-    }
-
-    pub fn iter_mut<P2: Pearl>(&mut self) -> IterMut<P2> {
-        // iterating mutably will not disturb any indices
-        self.world.iter_mut::<P2>()
-    }
-
-    pub fn insert<P2: Pearl>(&mut self, data: P2) -> Link<P2> {
-        // inserting does not disturb any indices
-        self.world.insert(data)
-    }
-
-    pub fn destroy<P2: Pearl>(&mut self, link: Link<P2>) -> bool {
-        // check if the link is valid
-        if !self.world.contains(link) {
-            return false;
-        }
-
-        // we have to queue removals because removing data disturbs indices
-        self.mod_queue
-            .insert(link.into_type(), |link, world| {
-                world.remove(link.into_type::<P2>());
-            })
-            .is_none()
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::world::{DropContext, InsertContext, RemoveContext, View};
+use crate::world::{view::DropContext, InsertContext, RemoveContext, View};
 
 pub trait Event: 'static {
     type Data<'a>;

@@ -1,5 +1,5 @@
 use boba_core::{
-    world::{DropContext, InsertContext, Link, RemoveContext, View},
+    world::{view::DropContext, InsertContext, Link, RemoveContext, View},
     Pearl,
 };
 use extension_trait::extension_trait;
