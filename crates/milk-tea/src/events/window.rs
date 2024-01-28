@@ -1,9 +1,19 @@
-use boba_core::{pearl::Event, world::Link};
+use boba_core::{pearl::SimpleEvent, world::Link};
 
 use crate::MilkTeaWindow;
 
-pub struct WindowInit;
+pub struct WindowInit {
+    link: Link<MilkTeaWindow>,
+}
 
-impl Event for WindowInit {
-    type Data<'a> = Link<MilkTeaWindow>;
+impl SimpleEvent for WindowInit {}
+
+impl WindowInit {
+    pub(crate) fn new(link: Link<MilkTeaWindow>) -> Self {
+        Self { link }
+    }
+
+    pub fn link(&self) -> Link<MilkTeaWindow> {
+        self.link
+    }
 }

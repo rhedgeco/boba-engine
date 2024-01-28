@@ -212,11 +212,11 @@ impl<'a, P: Pearl> View<'a, P> {
         self.world.insert(data)
     }
 
-    pub fn trigger<E: Event>(&mut self, event: &E::Data<'a>) -> bool {
+    pub fn trigger<E: Event>(&mut self, event: &mut E::Data<'a>) -> bool {
         self.world.nested_trigger::<E>(event, self.destroy_queue)
     }
 
-    pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &E) -> bool {
+    pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &mut E) -> bool {
         self.world.nested_trigger::<E>(event, self.destroy_queue)
     }
 

@@ -1,13 +1,12 @@
 use boba_core::World;
 use winit::{dpi::LogicalSize, event::Event, event_loop::EventLoop, window::WindowBuilder};
 
-use crate::{events::MilkTeaUpdate, MilkTeaWindow};
+use crate::{events::update::UpdateTimer, MilkTeaWindow};
 
 pub fn run_headless(world: &mut World) {
-    let mut update = MilkTeaUpdate::new();
+    let mut timer = UpdateTimer::new();
     loop {
-        let delta_time = update.next_delta();
-        world.trigger::<MilkTeaUpdate>(&delta_time);
+        world.trigger_simple(&mut timer.update());
     }
 }
 
@@ -20,12 +19,12 @@ pub fn run_windowed(world: &mut World) {
         .unwrap();
 
     world.insert(MilkTeaWindow::new(window));
-    let mut update = MilkTeaUpdate::new();
+
+    let mut timer = UpdateTimer::new();
     event_loop
         .run(move |event, _target| match event {
             Event::AboutToWait => {
-                let delta_time = update.next_delta();
-                world.trigger::<MilkTeaUpdate>(&delta_time);
+                world.trigger_simple(&mut timer.update());
                 for (_, w) in world.iter::<MilkTeaWindow>() {
                     w.window().request_redraw();
                 }

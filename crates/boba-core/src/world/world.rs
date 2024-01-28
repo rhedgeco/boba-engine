@@ -283,11 +283,11 @@ impl World {
         Some(data)
     }
 
-    pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &E) -> bool {
+    pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &mut E) -> bool {
         self.trigger::<E>(event)
     }
 
-    pub fn trigger<E: Event>(&mut self, event: &E::Data<'_>) -> bool {
+    pub fn trigger<E: Event>(&mut self, event: &mut E::Data<'_>) -> bool {
         let mut destroy_queue = DestroyQueue::new();
         if !self.nested_trigger::<E>(event, &mut destroy_queue) {
             return false;
@@ -299,7 +299,7 @@ impl World {
 
     pub(super) fn nested_trigger<'a, E: Event>(
         &mut self,
-        event: &E::Data<'a>,
+        event: &mut E::Data<'a>,
         destroy_queue: &mut DestroyQueue,
     ) -> bool {
         let event_id = TypeId::of::<E>();
@@ -347,7 +347,7 @@ impl World {
 mod sealed {
     use super::*;
 
-    pub type EventFn<E> = for<'a> fn(&mut World, &<E as Event>::Data<'a>, &mut DestroyQueue);
+    pub type EventFn<E> = for<'a> fn(&mut World, &mut <E as Event>::Data<'a>, &mut DestroyQueue);
     pub type EventMap<E> = IndexMap<TypeId, EventFn<E>>;
 
     /// the function to be called when pearls are removed from a world
@@ -360,7 +360,7 @@ mod sealed {
     /// the function to be called when an event is run on a world
     fn event_runner<'a, E: Event, P: Pearl + crate::pearl::Listener<E>>(
         world: &mut World,
-        data: &E::Data<'a>,
+        data: &mut E::Data<'a>,
         destroy_queue: &mut DestroyQueue,
     ) {
         log::info!(

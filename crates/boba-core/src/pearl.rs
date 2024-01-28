@@ -24,5 +24,5 @@ pub trait Pearl: Sized + 'static {
 }
 
 pub trait Listener<E: Event>: Pearl {
-    fn update(view: &mut View<'_, Self>, data: &E::Data<'_>);
+    fn update(view: &mut View<'_, Self>, data: &mut E::Data<'_>);
 }

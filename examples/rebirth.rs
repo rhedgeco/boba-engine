@@ -20,7 +20,7 @@ impl Pearl for Phoenix {
 }
 
 impl Listener<MilkTeaUpdate> for Phoenix {
-    fn update(view: &mut View<'_, Self>, _: &f32) {
+    fn update(view: &mut View<'_, Self>, _: &mut MilkTeaUpdate) {
         println!(
             "A NEW LIFE BURSTS FORTH FROM THE ASHES: GENERATION {}!",
             view.0

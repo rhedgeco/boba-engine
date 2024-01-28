@@ -19,6 +19,7 @@ impl MilkTeaWindow {
 
 impl Pearl for MilkTeaWindow {
     fn on_insert(context: InsertContext<Self>) {
-        context.view.trigger::<WindowInit>(&context.link);
+        let mut init = WindowInit::new(context.link);
+        context.view.trigger_simple(&mut init);
     }
 }
