@@ -172,10 +172,6 @@ impl World {
         }
     }
 
-    pub fn view_walker<P: Pearl>(&mut self) -> Option<Walker<P>> {
-        Walker::new(self)
-    }
-
     pub fn insert<P: Pearl>(&mut self, data: P) -> Link<P> {
         self.insert_and(data, |_| {})
     }
@@ -287,33 +283,36 @@ impl World {
         Some(data)
     }
 
-    pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &E) {
+    pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &E) -> bool {
         self.trigger::<E>(event)
     }
 
-    pub fn trigger<E: Event>(&mut self, event: &E::Data<'_>) {
+    pub fn trigger<E: Event>(&mut self, event: &E::Data<'_>) -> bool {
+        let mut destroy_queue = DestroyQueue::new();
+        if !self.nested_trigger::<E>(event, &mut destroy_queue) {
+            return false;
+        }
+
+        destroy_queue.execute_on(self);
+        true
+    }
+
+    pub(super) fn nested_trigger<'a, E: Event>(
+        &mut self,
+        event: &E::Data<'a>,
+        destroy_queue: &mut DestroyQueue,
+    ) -> bool {
         let event_id = TypeId::of::<E>();
-        let Some(anymap) = self.event_runners.remove(&event_id) else {
-            return;
+        let Some(anymap) = self.event_runners.get(&event_id) else {
+            return false;
         };
 
         let event_map = anymap.downcast_ref::<sealed::EventMap<E>>().unwrap();
-        for runner in event_map.values() {
-            runner(self, event);
+        for runner in event_map.clone().values() {
+            runner(self, event, destroy_queue);
         }
 
-        use hashbrown::hash_map::Entry;
-        match self.event_runners.entry(event_id) {
-            Entry::Vacant(e) => {
-                e.insert(anymap);
-            }
-            Entry::Occupied(e) => {
-                e.into_mut()
-                    .downcast_mut::<sealed::EventMap<E>>()
-                    .unwrap()
-                    .extend(event_map);
-            }
-        }
+        true
     }
 
     pub(super) fn get_map_handle<P: Pearl>(&self) -> Option<Handle<AnyMapBox>> {
@@ -348,7 +347,7 @@ impl World {
 mod sealed {
     use super::*;
 
-    pub type EventFn<E> = for<'a> fn(&mut World, &<E as Event>::Data<'a>);
+    pub type EventFn<E> = for<'a> fn(&mut World, &<E as Event>::Data<'a>, &mut DestroyQueue);
     pub type EventMap<E> = IndexMap<TypeId, EventFn<E>>;
 
     /// the function to be called when pearls are removed from a world
@@ -362,6 +361,7 @@ mod sealed {
     fn event_runner<'a, E: Event, P: Pearl + crate::pearl::Listener<E>>(
         world: &mut World,
         data: &E::Data<'a>,
+        destroy_queue: &mut DestroyQueue,
     ) {
         log::info!(
             "Running `{}` event for all '{}' pearls",
@@ -369,7 +369,7 @@ mod sealed {
             std::any::type_name::<P>()
         );
 
-        let Some(mut view_walker) = world.view_walker::<P>() else {
+        let Some(mut view_walker) = Walker::new(world, destroy_queue) else {
             return;
         };
 

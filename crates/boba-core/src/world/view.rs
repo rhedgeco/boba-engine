@@ -6,7 +6,10 @@ use std::{
 use handle_map::Handle;
 use indexmap::IndexMap;
 
-use crate::{Pearl, World};
+use crate::{
+    pearl::{Event, SimpleEvent},
+    Pearl, World,
+};
 
 use super::{AnyMapBox, Iter, IterMut, Link};
 
@@ -67,7 +70,7 @@ pub struct DropContext<'a, 'view, P: Pearl> {
 
 pub struct Walker<'a, P> {
     world: &'a mut World,
-    destroy_queue: DestroyQueue,
+    destroy_queue: &'a mut DestroyQueue,
     map_handle: Handle<AnyMapBox>,
     data_index: usize,
     data_cap: usize,
@@ -75,19 +78,13 @@ pub struct Walker<'a, P> {
     _type: PhantomData<*const P>,
 }
 
-impl<'a, P> Drop for Walker<'a, P> {
-    fn drop(&mut self) {
-        self.destroy_queue.execute_on(self.world);
-    }
-}
-
 impl<'a, P: Pearl> Walker<'a, P> {
-    pub fn new(world: &'a mut World) -> Option<Self> {
+    pub(super) fn new(world: &'a mut World, destroy_queue: &'a mut DestroyQueue) -> Option<Self> {
         let map_handle = world.get_map_handle::<P>()?;
         let data_cap = world.get_map_with::<P>(map_handle).unwrap().len();
         Some(Self {
             world,
-            destroy_queue: DestroyQueue::new(),
+            destroy_queue,
             map_handle,
             data_index: 0,
             data_cap,
@@ -110,7 +107,7 @@ impl<'a, P: Pearl> Walker<'a, P> {
                 data_handle,
             },
             world: self.world,
-            destroy_queue: &mut self.destroy_queue,
+            destroy_queue: self.destroy_queue,
             _type: PhantomData,
         })
     }
@@ -213,6 +210,14 @@ impl<'a, P: Pearl> View<'a, P> {
     pub fn insert<P2: Pearl>(&mut self, data: P2) -> Link<P2> {
         // inserting does not disturb any indices
         self.world.insert(data)
+    }
+
+    pub fn trigger<E: Event>(&mut self, event: &E::Data<'a>) -> bool {
+        self.world.nested_trigger::<E>(event, self.destroy_queue)
+    }
+
+    pub fn trigger_simple<E: SimpleEvent>(&mut self, event: &E) -> bool {
+        self.world.nested_trigger::<E>(event, self.destroy_queue)
     }
 
     pub fn destroy<P2: Pearl>(&mut self, link: Link<P2>) -> bool {
