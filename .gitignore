@@ -5,3 +5,4 @@ Cargo.lock
 # ignore flamgraph items
 flamegraph.svg
 perf.data
+perf.data.old
