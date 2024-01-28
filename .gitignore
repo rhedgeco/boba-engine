@@ -1,2 +1,7 @@
+# ignore cargo items
 /target
 Cargo.lock
+
+# ignore flamgraph items
+flamegraph.svg
+perf.data
