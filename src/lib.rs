@@ -8,5 +8,5 @@ pub mod prelude {
     };
 
     pub use boba_3d::{glam::*, transform::TransformView, Transform};
-    pub use milk_tea::{events::MilkTeaUpdate, run_headless};
+    pub use milk_tea::{events::MilkTeaUpdate, run_headless, run_windowed};
 }

@@ -18,5 +18,5 @@ fn main() {
     env_logger::init();
     let mut world = World::new();
     world.insert(FpsPrinter::default());
-    run_headless(&mut world);
+    run_windowed(&mut world);
 }
