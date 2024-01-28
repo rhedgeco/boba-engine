@@ -80,9 +80,6 @@ pub struct InsertContext<'a, 'view, P: Pearl> {
     _private: (),
 }
 
-pub type Iter<'a, P> = map::Iter<'a, P>;
-pub type IterMut<'a, P> = map::IterMut<'a, P>;
-
 struct PearlData {
     map_handle: Handle<AnyMapBox>,
     on_remove: Vec<fn(&mut World)>,
@@ -158,17 +155,37 @@ impl World {
             .get_mut(link.data_handle)
     }
 
+    pub fn operate_view<P: Pearl>(&mut self, link: Link<P>, f: impl FnOnce(&mut View<P>)) -> bool {
+        let mut destroy_queue = DestroyQueue::new();
+        if let Some(mut view) = View::new(link, self, &mut destroy_queue) {
+            f(&mut view);
+        } else {
+            return false;
+        };
+
+        destroy_queue.execute_on(self);
+        true
+    }
+
     pub fn iter<P: Pearl>(&self) -> Iter<P> {
-        match self.get_map::<P>() {
-            Some(map) => map.iter(),
-            None => Iter::empty(),
+        let Some(map_handle) = self.get_map_handle::<P>() else {
+            return Iter::empty();
+        };
+
+        Iter {
+            map_handle,
+            iter: self.get_map_with(map_handle).unwrap().iter(),
         }
     }
 
     pub fn iter_mut<P: Pearl>(&mut self) -> IterMut<P> {
-        match self.get_map_mut::<P>() {
-            Some(map) => map.iter_mut(),
-            None => IterMut::empty(),
+        let Some(map_handle) = self.get_map_handle::<P>() else {
+            return IterMut::empty();
+        };
+
+        IterMut {
+            map_handle,
+            iter: self.get_map_with_mut(map_handle).unwrap().iter_mut(),
         }
     }
 
@@ -325,12 +342,6 @@ impl World {
         Some(anymap.as_map::<P>().unwrap())
     }
 
-    pub(super) fn get_map_mut<P: Pearl>(&mut self) -> Option<&mut WorldMap<P>> {
-        let map_handle = self.get_map_handle::<P>()?;
-        let anymap = self.pearl_maps.get_data_mut(map_handle).unwrap();
-        Some(anymap.as_map_mut::<P>().unwrap())
-    }
-
     pub(super) fn get_map_with<P: Pearl>(&self, handle: Handle<AnyMapBox>) -> Option<&WorldMap<P>> {
         self.pearl_maps.get_data(handle)?.as_map::<P>()
     }
@@ -405,5 +416,63 @@ mod sealed {
             let data = self.pearl_data.get_mut(&pearl_id).unwrap();
             data.on_remove.push(event_remover::<E, P>);
         }
+    }
+}
+
+pub struct Iter<'a, P> {
+    map_handle: Handle<AnyMapBox>,
+    iter: map::Iter<'a, P>,
+}
+
+impl<'a, P> Iter<'a, P> {
+    pub fn empty() -> Self {
+        Self {
+            map_handle: Handle::from_raw(0),
+            iter: map::Iter::empty(),
+        }
+    }
+}
+
+impl<'a, P> Iterator for Iter<'a, P> {
+    type Item = (Link<P>, &'a P);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (data_handle, data) = self.iter.next()?;
+        Some((
+            Link {
+                map_handle: self.map_handle,
+                data_handle,
+            },
+            data,
+        ))
+    }
+}
+
+pub struct IterMut<'a, P> {
+    map_handle: Handle<AnyMapBox>,
+    iter: map::IterMut<'a, P>,
+}
+
+impl<'a, P> IterMut<'a, P> {
+    pub fn empty() -> Self {
+        Self {
+            map_handle: Handle::from_raw(0),
+            iter: map::IterMut::empty(),
+        }
+    }
+}
+
+impl<'a, P> Iterator for IterMut<'a, P> {
+    type Item = (Link<P>, &'a mut P);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (data_handle, data) = self.iter.next()?;
+        Some((
+            Link {
+                map_handle: self.map_handle,
+                data_handle,
+            },
+            data,
+        ))
     }
 }
