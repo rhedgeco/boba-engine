@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 winit = "0.29"
+extension-trait = "1.0"
 boba-core = { path = "../boba-core" }
