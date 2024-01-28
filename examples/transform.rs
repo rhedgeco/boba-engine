@@ -1,27 +1,4 @@
-use std::time::Instant;
-
 use boba_engine::prelude::*;
-
-pub struct Update {
-    instant: Option<Instant>,
-}
-
-impl Event for Update {
-    type Data<'a> = f32;
-}
-
-impl Update {
-    pub fn new() -> Self {
-        Self { instant: None }
-    }
-
-    pub fn update(&mut self) -> f32 {
-        match self.instant.replace(Instant::now()) {
-            Some(last) => Instant::now().duration_since(last).as_secs_f32(),
-            None => 0f32,
-        }
-    }
-}
 
 pub struct TransformRotator {
     transform: Link<Transform>,
@@ -31,7 +8,7 @@ pub struct TransformRotator {
 
 impl Pearl for TransformRotator {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<Update>();
+        source.listen::<MilkTeaUpdate>();
     }
 
     fn on_insert(context: InsertContext<Self>) {
@@ -41,7 +18,7 @@ impl Pearl for TransformRotator {
     }
 }
 
-impl Listener<Update> for TransformRotator {
+impl Listener<MilkTeaUpdate> for TransformRotator {
     fn update(view: &mut View<'_, Self>, delta_time: &f32) {
         view.current = (view.current + view.speed * delta_time) % 360f32;
         let rotation = view.current;
@@ -56,11 +33,11 @@ pub struct TransformPrinter {
 
 impl Pearl for TransformPrinter {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<Update>();
+        source.listen::<MilkTeaUpdate>();
     }
 }
 
-impl Listener<Update> for TransformPrinter {
+impl Listener<MilkTeaUpdate> for TransformPrinter {
     fn update(view: &mut View<'_, Self>, _: &f32) {
         let transform = view.view(view.transform).unwrap();
         println!("Child world_pos: {}", transform.world_pos());
@@ -68,6 +45,7 @@ impl Listener<Update> for TransformPrinter {
 }
 
 fn main() {
+    env_logger::init();
     let mut world = World::new();
 
     // create initial transform
@@ -88,10 +66,6 @@ fn main() {
     // create transform printer
     world.insert(TransformPrinter { transform: t2 });
 
-    // create update event
-    let mut update = Update::new();
-    loop {
-        let delta_time = update.update();
-        world.trigger::<Update>(&delta_time);
-    }
+    // run headless
+    run_headless(&mut world);
 }

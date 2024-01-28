@@ -1,0 +1,7 @@
+[package]
+name = "milk-tea"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+boba-core = { path = "../boba-core" }

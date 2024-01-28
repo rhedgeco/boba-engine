@@ -1,36 +1,22 @@
-use std::time::Instant;
-
 use boba_engine::prelude::*;
 
-struct Update;
-impl SimpleEvent for Update {}
-
 #[derive(Default)]
-struct FpsPrinter {
-    instant: Option<Instant>,
-}
-
+struct FpsPrinter;
 impl Pearl for FpsPrinter {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<Update>();
+        source.listen::<MilkTeaUpdate>();
     }
 }
 
-impl Listener<Update> for FpsPrinter {
-    fn update(view: &mut View<'_, Self>, _: &Update) {
-        let Some(past) = view.instant.replace(Instant::now()) else {
-            return;
-        };
-
-        let delta = Instant::now().duration_since(past).as_secs_f64();
-        println!("FPS: {}", 1. / delta);
+impl Listener<MilkTeaUpdate> for FpsPrinter {
+    fn update(_: &mut View<'_, Self>, delta_time: &f32) {
+        println!("FPS: {}", 1. / delta_time);
     }
 }
 
 fn main() {
+    env_logger::init();
     let mut world = World::new();
     world.insert(FpsPrinter::default());
-    loop {
-        world.trigger_simple(&Update);
-    }
+    run_headless(&mut world);
 }

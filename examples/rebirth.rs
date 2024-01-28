@@ -1,13 +1,10 @@
 use boba_engine::prelude::*;
 
-struct Update;
-impl SimpleEvent for Update {}
-
 struct Phoenix(u64);
 
 impl Pearl for Phoenix {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<Update>();
+        source.listen::<MilkTeaUpdate>();
     }
 
     fn on_insert(_: InsertContext<Self>) {
@@ -22,8 +19,8 @@ impl Pearl for Phoenix {
     }
 }
 
-impl Listener<Update> for Phoenix {
-    fn update(view: &mut View<'_, Self>, _: &Update) {
+impl Listener<MilkTeaUpdate> for Phoenix {
+    fn update(view: &mut View<'_, Self>, _: &f32) {
         println!(
             "A NEW LIFE BURSTS FORTH FROM THE ASHES: GENERATION {}!",
             view.0
@@ -34,10 +31,8 @@ impl Listener<Update> for Phoenix {
 }
 
 fn main() {
+    env_logger::init();
     let mut world = World::new();
     world.insert(Phoenix(0));
-
-    loop {
-        world.trigger_simple(&Update);
-    }
+    run_headless(&mut world);
 }
