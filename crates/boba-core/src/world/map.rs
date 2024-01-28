@@ -71,18 +71,9 @@ impl<T> WorldMap<T> {
         Some(&mut self.data[*self.indexer.get_data(handle.into_type())?].data)
     }
 
-    pub fn index_of(&self, handle: Handle<T>) -> Option<usize> {
-        self.indexer.get_data(handle.into_type()).cloned()
-    }
-
     pub fn get_index(&self, index: usize) -> Option<(Handle<T>, &T)> {
         let entry = self.data.get(index)?;
         Some((entry.handle.into_type(), &entry.data))
-    }
-
-    pub fn get_index_mut(&mut self, index: usize) -> Option<(Handle<T>, &mut T)> {
-        let entry = self.data.get_mut(index)?;
-        Some((entry.handle.into_type(), &mut entry.data))
     }
 
     pub fn iter(&self) -> Iter<T> {

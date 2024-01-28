@@ -100,24 +100,26 @@ impl<'a, P: Pearl> Walker<'a, P> {
             return None;
         }
 
-        let data_index = self.data_index;
+        let map = self.world.get_map_with::<P>(self.map_handle).unwrap();
+        let data_handle = map.get_index(self.data_index)?.0;
         self.data_index += 1;
+
         Some(View {
+            link: Link {
+                map_handle: self.map_handle,
+                data_handle,
+            },
             world: self.world,
             destroy_queue: &mut self.destroy_queue,
-            map_handle: self.map_handle,
-            data_index,
             _type: PhantomData,
         })
     }
 }
 
 pub struct View<'a, P: Pearl> {
+    link: Link<P>,
     world: &'a mut World,
     destroy_queue: &'a mut DestroyQueue,
-    map_handle: Handle<AnyMapBox>,
-    data_index: usize,
-
     _type: PhantomData<*const P>,
 }
 
@@ -132,8 +134,7 @@ impl<'a, P: Pearl> Drop for View<'a, P> {
 
 impl<'a, P: Pearl> DerefMut for View<'a, P> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let map = self.world.get_map_with_mut(self.map_handle).unwrap();
-        map.get_index_mut(self.data_index).unwrap().1
+        self.world.get_mut(self.link).unwrap()
     }
 }
 
@@ -141,34 +142,30 @@ impl<'a, P: Pearl> Deref for View<'a, P> {
     type Target = P;
 
     fn deref(&self) -> &Self::Target {
-        let map = self.world.get_map_with(self.map_handle).unwrap();
-        map.get_index(self.data_index).unwrap().1
+        self.world.get(self.link).unwrap()
     }
 }
 
 impl<'a, P: Pearl> View<'a, P> {
     pub(super) fn new(
+        link: Link<P>,
         world: &'a mut World,
         destroy_queue: &'a mut DestroyQueue,
-        map_handle: Handle<AnyMapBox>,
-        data_index: usize,
-    ) -> Self {
-        Self {
+    ) -> Option<Self> {
+        if !world.contains(link) {
+            return None;
+        }
+
+        Some(Self {
+            link,
             world,
             destroy_queue,
-            map_handle,
-            data_index,
             _type: PhantomData,
-        }
+        })
     }
 
     pub fn current_link(&self) -> Link<P> {
-        let map = self.world.get_map_with(self.map_handle).unwrap();
-        let data_handle = map.get_index(self.data_index).unwrap().0;
-        Link {
-            map_handle: self.map_handle,
-            data_handle,
-        }
+        self.link
     }
 
     pub fn count<P2: Pearl>(&self) -> usize {
@@ -183,20 +180,25 @@ impl<'a, P: Pearl> View<'a, P> {
         self.world.contains(link)
     }
 
+    pub fn contains_global<P2: Pearl>(&self) -> bool {
+        self.world.contains_global::<P2>()
+    }
+
     pub fn get<P2: Pearl>(&self, link: Link<P2>) -> Option<&P2> {
         self.world.get(link)
     }
 
-    pub fn view_other<P2: Pearl>(&mut self, link: Link<P2>) -> Option<View<P2>> {
-        let map = self.world.get_map_with(link.map_handle)?;
-        let data_index = map.index_of(link.data_handle)?;
-        Some(View {
-            world: self.world,
-            destroy_queue: self.destroy_queue,
-            map_handle: link.map_handle,
-            data_index,
-            _type: PhantomData,
-        })
+    pub fn get_global<P2: Pearl>(&self) -> Option<&P2> {
+        self.world.get_global::<P2>()
+    }
+
+    pub fn view<P2: Pearl>(&mut self, link: Link<P2>) -> Option<View<P2>> {
+        View::new(link, self.world, self.destroy_queue)
+    }
+
+    pub fn view_global<P2: Pearl>(&mut self) -> Option<View<P2>> {
+        let link = self.world.get_global_link::<P2>()?;
+        View::new(link, self.world, self.destroy_queue)
     }
 
     pub fn iter<P2: Pearl>(&self) -> Iter<P2> {
@@ -220,6 +222,14 @@ impl<'a, P: Pearl> View<'a, P> {
         }
 
         // we have to queue removals because removing data disturbs indices
+        self.destroy_queue.insert(link)
+    }
+
+    pub fn destroy_global<P2: Pearl>(&mut self) -> bool {
+        let Some(link) = self.world.get_global_link::<P2>() else {
+            return false;
+        };
+
         self.destroy_queue.insert(link)
     }
 }

@@ -36,7 +36,7 @@ impl Pearl for TransformRotator {
 
     fn on_insert(context: InsertContext<Self>) {
         let rotation = context.view.current;
-        let mut transform = context.view.view_other(context.view.transform).unwrap();
+        let mut transform = context.view.view(context.view.transform).unwrap();
         transform.set_local_rot(Quat::from_rotation_z(rotation.to_radians()))
     }
 }
@@ -45,7 +45,7 @@ impl Listener<Update> for TransformRotator {
     fn update(view: &mut View<'_, Self>, delta_time: &f32) {
         view.current = (view.current + view.speed * delta_time) % 360f32;
         let rotation = view.current;
-        let mut transform = view.view_other(view.transform).unwrap();
+        let mut transform = view.view(view.transform).unwrap();
         transform.set_local_rot(Quat::from_rotation_z(rotation.to_radians()));
     }
 }
@@ -62,7 +62,7 @@ impl Pearl for TransformPrinter {
 
 impl Listener<Update> for TransformPrinter {
     fn update(view: &mut View<'_, Self>, _: &f32) {
-        let transform = view.view_other(view.transform).unwrap();
+        let transform = view.view(view.transform).unwrap();
         println!("Child world_pos: {}", transform.world_pos());
     }
 }
