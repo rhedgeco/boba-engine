@@ -11,18 +11,20 @@ impl Pearl for TransformRotator {
         source.listen::<MilkTeaUpdate>();
     }
 
-    fn on_insert(context: InsertContext<Self>) {
-        let rotation = context.view.current;
-        let mut transform = context.view.view(context.view.transform).unwrap();
+    fn on_insert(mut ctx: InsertContext<Self>) {
+        let rotation = ctx.view.current;
+        let transform = ctx.view.transform;
+        let mut transform = ctx.view.world_mut().get_view(transform).unwrap();
         transform.set_local_rot(Quat::from_rotation_z(rotation.to_radians()))
     }
 }
 
 impl Listener<MilkTeaUpdate> for TransformRotator {
-    fn update(view: &mut View<'_, Self>, event: &mut MilkTeaUpdate) {
+    fn trigger(mut view: PearlView<Self>, event: &mut MilkTeaUpdate) {
         view.current = (view.current + view.speed * event.delta_time()) % 360f32;
         let rotation = view.current;
-        let mut transform = view.view(view.transform).unwrap();
+        let transform = view.transform;
+        let mut transform = view.world_mut().get_view(transform).unwrap();
         transform.set_local_rot(Quat::from_rotation_z(rotation.to_radians()));
     }
 }
@@ -38,8 +40,9 @@ impl Pearl for TransformPrinter {
 }
 
 impl Listener<MilkTeaUpdate> for TransformPrinter {
-    fn update(view: &mut View<'_, Self>, _: &mut MilkTeaUpdate) {
-        let transform = view.view(view.transform).unwrap();
+    fn trigger(mut view: PearlView<Self>, _: &mut MilkTeaUpdate) {
+        let transform = view.transform;
+        let transform = view.world_mut().get_view(transform).unwrap();
         println!("Child world_pos: {}", transform.world_pos());
     }
 }
@@ -52,7 +55,7 @@ fn main() {
     let t1 = world.insert(Transform::new());
 
     // create child transform
-    let t2 = world.insert_and(Transform::from_pos(Vec3::X), |t| {
+    let t2 = world.insert_then(Transform::from_pos(Vec3::X), |mut t| {
         t.set_parent(t1);
     });
 

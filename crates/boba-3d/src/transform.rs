@@ -1,5 +1,5 @@
 use boba_core::{
-    world::{view::DropContext, InsertContext, Link, RemoveContext, View},
+    world::{InsertContext, Link, PearlView, RemoveContext, WorldAccess},
     Pearl,
 };
 use extension_trait::extension_trait;
@@ -19,7 +19,6 @@ pub struct Transform {
     lossy_scale: Vec3,
     pending_sync: bool,
 
-    link: Link<Self>,
     parent: Option<Link<Self>>,
     children: IndexSet<Link<Self>>,
 }
@@ -36,7 +35,6 @@ impl Default for Transform {
             local_scale: Vec3::ONE,
             lossy_scale: Vec3::ONE,
             pending_sync: false,
-            link: Link::from_raw(0, 0),
             parent: None,
             children: IndexSet::new(),
         }
@@ -44,30 +42,23 @@ impl Default for Transform {
 }
 
 impl Pearl for Transform {
-    fn on_insert(context: InsertContext<Self>) {
-        context.view.pending_sync = false;
-        context.view.link = context.link;
+    fn on_insert(mut ctx: InsertContext<Self>) {
+        ctx.view.pending_sync = false;
     }
 
-    fn on_remove(context: RemoveContext<Self>) {
+    fn on_remove(ctx: RemoveContext<Self>) {
         // remove the parent
-        let parent_option = context.pearl.parent.take();
+        let parent_option = ctx.pearl.parent.take();
 
         // remove the pearl from its parents children list
         if let Some(parent) = parent_option {
-            let parent = context.world.get_mut(parent).unwrap();
-            parent.children.remove(&context.pearl.link);
+            let parent = ctx.world.get_mut(parent).unwrap();
+            parent.children.remove(&ctx.old_link);
         }
 
         // remove the pearl from its childrens parent slot
-        for child in context.pearl.children.drain(..) {
-            context.world.get_mut(child).unwrap().parent = parent_option;
-        }
-    }
-
-    fn on_view_drop(context: DropContext<Self>) {
-        if context.view.pending_sync {
-            context.view.sync_transforms();
+        for child in ctx.pearl.children.drain(..) {
+            ctx.world.get_mut(child).unwrap().parent = parent_option;
         }
     }
 }
@@ -173,10 +164,10 @@ impl Transform {
 }
 
 #[extension_trait]
-impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
+impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
     fn set_parent_no_sync(&mut self, parent_option: Option<Link<Transform>>) -> bool {
         // early return if the parent is Some and doesnt exist
-        if parent_option.is_some_and(|parent| !self.contains(parent)) {
+        if parent_option.is_some_and(|parent| !self.world().contains(parent)) {
             return false;
         }
 
@@ -184,9 +175,9 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
         let old_parent_option = std::mem::replace(&mut self.parent, parent_option);
 
         // if the old parent existed, remove the child from its children list
-        let current_link = self.link;
+        let current_link = self.link();
         if let Some(old_parent_link) = old_parent_option {
-            let mut old_parent = self.view(old_parent_link).unwrap();
+            let mut old_parent = self.world_mut().get_view(old_parent_link).unwrap();
             old_parent.children.remove(&current_link);
         };
 
@@ -196,7 +187,7 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
         };
 
         // add the child to the new parents children list
-        let mut parent = self.view(parent_link).unwrap();
+        let mut parent = self.world_mut().get_view(parent_link).unwrap();
         parent.children.insert(current_link);
 
         // resolve recusrive tree branches by walking up each parent
@@ -204,7 +195,7 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
         return true;
 
         fn resolve_recursive(
-            parent: &mut View<Transform>,
+            parent: &mut PearlView<Transform>,
             source: Link<Transform>,
             old_parent_option: Option<Link<Transform>>,
         ) {
@@ -213,19 +204,20 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
                 None => (),
                 // if next parent is not the source node, recurse up and check the next parent in the chain
                 Some(next_parent_link) if next_parent_link != source => {
-                    let mut next_parent = parent.view(next_parent_link).unwrap();
+                    let mut next_parent = parent.world_mut().get_view(next_parent_link).unwrap();
                     resolve_recursive(&mut next_parent, source, old_parent_option)
                 }
                 // if a recursive loop was found, remove the recursive child from the source node
                 // and set the recursive childs parent to the source nodes old parent.
                 // also add the recursive child to the old parents children list
                 Some(next_parent_link) => {
-                    let parent_link = parent.link;
+                    let parent_link = parent.link();
                     parent.parent = old_parent_option;
-                    let mut next_parent = parent.view(next_parent_link).unwrap();
+                    let mut next_parent = parent.world_mut().get_view(next_parent_link).unwrap();
                     next_parent.children.remove(&parent_link);
                     if let Some(old_parent_link) = old_parent_option {
-                        let mut old_parent = next_parent.view(old_parent_link).unwrap();
+                        let mut old_parent =
+                            next_parent.world_mut().get_view(old_parent_link).unwrap();
                         old_parent.children.insert(parent_link);
                     }
                 }
@@ -235,9 +227,10 @@ impl<'a> PrivateTransformView<'a> for View<'a, Transform> {
 }
 
 #[extension_trait]
-pub impl<'a> TransformView<'a> for View<'a, Transform> {
-    fn parent(&mut self) -> Option<View<Transform>> {
-        Some(self.view(self.parent?).unwrap())
+pub impl<'a> TransformView<'a> for PearlView<'a, Transform> {
+    fn parent(&mut self) -> Option<PearlView<Transform>> {
+        let parent = self.parent?;
+        Some(self.world_mut().get_view(parent).unwrap())
     }
 
     fn walk_children(&mut self) -> ChildWalker<'_, 'a> {
@@ -311,13 +304,13 @@ pub impl<'a> TransformView<'a> for View<'a, Transform> {
 }
 
 pub struct ChildWalker<'a, 'source> {
-    view: &'a mut View<'source, Transform>,
+    view: &'a mut PearlView<'source, Transform>,
     children: Box<[Link<Transform>]>,
     current: usize,
 }
 
 impl<'a, 'source> ChildWalker<'a, 'source> {
-    pub fn new(view: &'a mut View<'source, Transform>) -> Self {
+    pub fn new(view: &'a mut PearlView<'source, Transform>) -> Self {
         let children = view.child_links().copied().collect();
         Self {
             view,
@@ -326,9 +319,9 @@ impl<'a, 'source> ChildWalker<'a, 'source> {
         }
     }
 
-    pub fn walk_next(&mut self) -> Option<View<Transform>> {
+    pub fn walk_next(&mut self) -> Option<PearlView<Transform>> {
         let link = *self.children.get(self.current)?;
         self.current += 1;
-        Some(self.view.view(link).unwrap())
+        Some(self.view.world_mut().get_view(link).unwrap())
     }
 }

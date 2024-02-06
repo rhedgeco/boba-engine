@@ -20,13 +20,14 @@ impl Pearl for Phoenix {
 }
 
 impl Listener<MilkTeaUpdate> for Phoenix {
-    fn update(view: &mut View<'_, Self>, _: &mut MilkTeaUpdate) {
+    fn trigger(mut view: PearlView<Self>, _: &mut MilkTeaUpdate) {
         println!(
             "A NEW LIFE BURSTS FORTH FROM THE ASHES: GENERATION {}!",
             view.0
         );
-        view.destroy(view.current_link());
-        view.insert(Phoenix(view.0 + 1));
+        view.queue_destroy(view.link());
+        let next_phoenix = Phoenix(view.0 + 1);
+        view.world_mut().insert(next_phoenix);
     }
 }
 

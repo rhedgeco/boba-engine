@@ -1,5 +1,5 @@
 use boba_core::{
-    world::{InsertContext, View},
+    world::{InsertContext, PearlView, WorldAccess},
     Pearl,
 };
 use extension_trait::extension_trait;
@@ -22,14 +22,14 @@ impl MilkTeaWindow {
 }
 
 impl Pearl for MilkTeaWindow {
-    fn on_insert(context: InsertContext<Self>) {
-        let mut init = WindowInit::new(context.link);
-        context.view.trigger_simple(&mut init);
+    fn on_insert(mut ctx: InsertContext<Self>) {
+        let mut init = WindowInit::new(ctx.view.link());
+        ctx.view.world_mut().trigger_simple(&mut init);
     }
 }
 
 #[extension_trait]
-pub(crate) impl MilkTeaWindowViewCrate for View<'_, MilkTeaWindow> {
+pub(crate) impl MilkTeaWindowViewCrate for PearlView<'_, MilkTeaWindow> {
     fn render(&self) {
         println!("Rendering Window");
     }

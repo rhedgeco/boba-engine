@@ -1,4 +1,7 @@
-use boba_core::World;
+use boba_core::{
+    world::{WorldAccess, WorldInsert},
+    World,
+};
 use winit::{
     dpi::LogicalSize,
     event::{Event, WindowEvent},
@@ -39,7 +42,7 @@ pub fn run_windowed(world: &mut World) {
                         .find(|(_, window)| window.native().id() == window_id)
                     {
                         world.trigger_simple(&mut BeforeRender::new(link));
-                        world.operate_view(link, |view| view.render());
+                        world.get_view(link).map(|view| view.render());
                     }
                 }
                 _ => (),

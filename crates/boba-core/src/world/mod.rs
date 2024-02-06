@@ -1,7 +1,7 @@
-mod map;
+mod maps;
 mod world;
 
 pub mod view;
 
-pub use view::View;
+pub use view::PearlView;
 pub use world::*;

@@ -1,4 +1,4 @@
-use crate::world::{view::DropContext, InsertContext, RemoveContext, View};
+use crate::world::{view::PearlView, InsertContext, RemoveContext};
 
 pub trait Event: 'static {
     type Data<'a>;
@@ -18,11 +18,10 @@ pub trait EventSource<P> {
 #[allow(unused_variables)]
 pub trait Pearl: Sized + 'static {
     fn register(source: &mut impl EventSource<Self>) {}
-    fn on_insert(context: InsertContext<Self>) {}
-    fn on_remove(context: RemoveContext<Self>) {}
-    fn on_view_drop(context: DropContext<Self>) {}
+    fn on_insert(ctx: InsertContext<Self>) {}
+    fn on_remove(ctx: RemoveContext<Self>) {}
 }
 
 pub trait Listener<E: Event>: Pearl {
-    fn update(view: &mut View<'_, Self>, data: &mut E::Data<'_>);
+    fn trigger(view: PearlView<Self>, data: &mut E::Data<'_>);
 }
