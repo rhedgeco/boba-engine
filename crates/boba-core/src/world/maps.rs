@@ -116,7 +116,9 @@ impl<P> PearlMap<P> {
     }
 
     pub fn pop(&mut self) -> Option<PearlEntry<P>> {
-        self.pearls.pop()
+        let entry = self.pearls.pop()?;
+        self.indices.remove(entry.handle);
+        Some(entry)
     }
 
     pub fn remove(&mut self, handle: Handle<P>) -> Option<P> {
