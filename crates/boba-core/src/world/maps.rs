@@ -121,7 +121,7 @@ impl<P> PearlMap<P> {
 
     pub fn remove(&mut self, handle: Handle<P>) -> Option<P> {
         // swap remove the pearl from its place in the vec
-        let index = self.get_index(handle)?;
+        let index = self.indices.remove(handle.into_type())?;
         let pearl = self.pearls.swap_remove(index).pearl;
 
         // if another pearl was swapped there, correct its index
@@ -139,5 +139,36 @@ impl<P> PearlMap<P> {
 
     pub fn iter_mut(&mut self) -> core::slice::IterMut<PearlEntry<P>> {
         self.pearls.iter_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn remove() {
+        let mut map = PearlMap::<u32>::new();
+        let h1 = map.insert(1);
+        let h2 = map.insert(2);
+        let h3 = map.insert(3);
+        assert_eq!(map.get(h1), Some(&1));
+        assert_eq!(map.get(h2), Some(&2));
+        assert_eq!(map.get(h3), Some(&3));
+
+        map.remove(h1);
+        assert_eq!(map.get(h1), None);
+        assert_eq!(map.get(h2), Some(&2));
+        assert_eq!(map.get(h3), Some(&3));
+
+        map.remove(h2);
+        assert_eq!(map.get(h1), None);
+        assert_eq!(map.get(h2), None);
+        assert_eq!(map.get(h3), Some(&3));
+
+        map.remove(h3);
+        assert_eq!(map.get(h1), None);
+        assert_eq!(map.get(h2), None);
+        assert_eq!(map.get(h3), None);
     }
 }
