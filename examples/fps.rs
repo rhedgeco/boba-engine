@@ -1,5 +1,4 @@
 use boba_engine::prelude::*;
-use milk_tea::window::MilkTeaWindowSettings;
 
 #[derive(Default)]
 struct FpsPrinter;
