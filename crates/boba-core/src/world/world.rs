@@ -192,7 +192,7 @@ pub impl WorldAccess for World {
         PearlView::new(link, self)
     }
 
-    fn destroy_defer<P: Pearl>(&mut self, link: Link<P>) -> bool {
+    fn defer_destroy<P: Pearl>(&mut self, link: Link<P>) -> bool {
         match self.contains(link) {
             true => self
                 .queue

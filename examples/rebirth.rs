@@ -27,7 +27,7 @@ impl Listener<Update> for Phoenix {
         );
         let next_phoenix = Phoenix(view.0 + 1);
         view.world_mut().insert(next_phoenix);
-        view.destroy_self();
+        view.defer_destroy_self();
     }
 }
 

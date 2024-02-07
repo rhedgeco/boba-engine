@@ -43,7 +43,7 @@ impl<'a, P: Pearl> PearlView<'a, P> {
         self.world
     }
 
-    pub fn destroy_self(&mut self) -> bool {
-        self.world.destroy_defer(self.link)
+    pub fn defer_destroy_self(&mut self) -> bool {
+        self.world.defer_destroy(self.link)
     }
 }

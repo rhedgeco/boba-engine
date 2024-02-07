@@ -104,7 +104,7 @@ impl Listener<Update> for MilkTeaWindow {
 impl Listener<CloseRequest> for MilkTeaWindow {
     fn trigger(mut pearl: PearlView<Self>, event: &mut CloseRequest) {
         if pearl.settings.close_on_request && pearl.id() == event.id() {
-            pearl.destroy_self();
+            pearl.defer_destroy_self();
         }
     }
 }
