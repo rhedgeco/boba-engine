@@ -115,6 +115,10 @@ impl<P> PearlMap<P> {
         handle.into_type()
     }
 
+    pub fn pop(&mut self) -> Option<PearlEntry<P>> {
+        self.pearls.pop()
+    }
+
     pub fn remove(&mut self, handle: Handle<P>) -> Option<P> {
         // swap remove the pearl from its place in the vec
         let index = self.get_index(handle)?;

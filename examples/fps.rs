@@ -1,15 +1,16 @@
 use boba_engine::prelude::*;
+use milk_tea::window::MilkTeaWindowSettings;
 
 #[derive(Default)]
 struct FpsPrinter;
 impl Pearl for FpsPrinter {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<MilkTeaUpdate>();
+        source.listen::<Update>();
     }
 }
 
-impl Listener<MilkTeaUpdate> for FpsPrinter {
-    fn trigger(_: PearlView<Self>, event: &mut MilkTeaUpdate) {
+impl Listener<Update> for FpsPrinter {
+    fn trigger(_: PearlView<Self>, event: &mut Update) {
         println!("FPS: {}", 1. / event.delta_time());
     }
 }
@@ -18,5 +19,6 @@ fn main() {
     env_logger::init();
     let mut world = World::new();
     world.insert(FpsPrinter::default());
-    run_windowed(&mut world);
+    world.insert(MilkTeaWindowSettings::default());
+    milk_tea::run(&mut world);
 }

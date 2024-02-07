@@ -1,57 +1,81 @@
 use boba_core::{
-    world::{WorldAccess, WorldInsert},
+    world::{Link, WorldAccess, WorldInsert, WorldRemove},
     World,
 };
+use indexmap::IndexMap;
 use winit::{
-    dpi::LogicalSize,
     event::{Event, WindowEvent},
-    event_loop::EventLoop,
-    window::WindowBuilder,
+    event_loop::{ControlFlow, EventLoop},
+    window::WindowId,
 };
 
 use crate::{
-    events::{update::UpdateTimer, window::BeforeRender},
-    window::MilkTeaWindowViewCrate,
+    events::{update::UpdateTimer, window::CloseRequest},
+    window::{MilkTeaId, MilkTeaWindowSettings, MilkTeaWindowViewCrate},
     MilkTeaWindow,
 };
 
-pub fn run_headless(world: &mut World) {
-    let mut timer = UpdateTimer::new();
-    loop {
-        world.trigger_simple(&mut timer.update());
-    }
+#[derive(Clone, Copy)]
+pub(crate) struct WindowEntry {
+    pub link: Link<MilkTeaWindow>,
+    pub id: MilkTeaId,
 }
 
-pub fn run_windowed(world: &mut World) {
+pub fn run(world: &mut World) {
+    run_with_flow(world, true);
+}
+
+pub fn run_with_flow(world: &mut World, poll: bool) {
     let event_loop = EventLoop::new().unwrap();
-    let window = WindowBuilder::new()
-        .with_title("Milk Tea Window")
-        .with_inner_size(LogicalSize::new(1280.0, 720.0))
-        .build(&event_loop)
-        .unwrap();
+    event_loop.set_control_flow(match poll {
+        false => ControlFlow::Wait,
+        true => ControlFlow::Poll,
+    });
 
-    world.insert(MilkTeaWindow::new(window));
-
+    let mut window_library = IndexMap::<WindowId, WindowEntry>::new();
     let mut timer = UpdateTimer::new();
     event_loop
-        .run(move |event, _target| match event {
-            Event::WindowEvent { window_id, event } => match event {
-                WindowEvent::RedrawRequested => {
-                    if let Some((link, _)) = world
-                        .iter::<MilkTeaWindow>()
-                        .find(|(_, window)| window.native().id() == window_id)
-                    {
-                        world.trigger_simple(&mut BeforeRender::new(link));
-                        world.get_view(link).map(|view| view.render());
+        .run(move |event, target| match event {
+            Event::WindowEvent { window_id, event } => {
+                let Some(entry) = window_library.get(&window_id).cloned() else {
+                    log::error!("received a window event but window was not accounted for");
+                    return;
+                };
+
+                match event {
+                    WindowEvent::RedrawRequested => {
+                        if let Some(mut window) = world.get_view(entry.link) {
+                            window.render();
+                        }
                     }
+                    WindowEvent::CloseRequested => {
+                        world.trigger_simple(&mut CloseRequest::new(entry.link, entry.id));
+                    }
+                    _ => (),
                 }
-                _ => (),
-            },
+            }
             Event::AboutToWait => {
-                world.trigger_simple(&mut timer.update());
-                for (_, window) in world.iter::<MilkTeaWindow>() {
-                    window.native().request_redraw();
+                // create pending windows
+                while let Some((_, settings)) = world.pop::<MilkTeaWindowSettings>() {
+                    match MilkTeaWindow::new(settings, target) {
+                        Ok(window) => {
+                            let id = window.id();
+                            let native_id = window.native().id();
+                            let link = world.insert(window);
+                            window_library.insert(native_id, WindowEntry { link, id });
+                        }
+                        Err(e) => {
+                            log::error!("Failed to create window. Error: {e}");
+                            continue;
+                        }
+                    };
                 }
+
+                // trigger a world update
+                world.trigger_simple(&mut timer.update());
+
+                // flush the destroy queue after everything is finished
+                world.flush_destroy_queue();
             }
             _ => (),
         })

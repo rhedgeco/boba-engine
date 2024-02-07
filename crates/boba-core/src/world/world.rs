@@ -96,11 +96,14 @@ pub struct RemoveContext<'a, P> {
     _private: (),
 }
 
+pub(super) type DestroyQueue = IndexMap<Link<()>, fn(Link<()>, &mut World)>;
+
 #[derive(Default)]
 pub struct World {
     events: HashMap<TypeId, Box<dyn Any>>,
     map_data: IndexMap<TypeId, MapData>,
     maps: SparseHandleMap<MapBox>,
+    queue: DestroyQueue,
 }
 
 impl<P: 'static> Index<Link<P>> for World {
@@ -184,6 +187,23 @@ pub impl WorldAccess for World {
         PearlView::new(link, self)
     }
 
+    fn find_view<P: Pearl>(&mut self, predicate: impl Fn(&P) -> bool) -> Option<PearlView<P>> {
+        let (link, _) = self.iter::<P>().find(|(_, p)| predicate(p))?;
+        PearlView::new(link, self)
+    }
+
+    fn destroy_defer<P: Pearl>(&mut self, link: Link<P>) -> bool {
+        match self.contains(link) {
+            true => self
+                .queue
+                .insert(link.into_type(), |link, world| {
+                    world.remove(link.into_type::<P>());
+                })
+                .is_none(),
+            false => false,
+        }
+    }
+
     fn iter<P: Pearl>(&self) -> Iter<P> {
         match self.get_map::<P>() {
             None => Iter::empty(),
@@ -265,6 +285,24 @@ pub impl WorldInsert for World {
 
 #[extension_trait]
 pub impl WorldRemove for World {
+    fn flush_destroy_queue(&mut self) {
+        for (link, func) in core::mem::replace(&mut self.queue, DestroyQueue::new()) {
+            func(link, self);
+        }
+    }
+
+    fn pop<P: Pearl>(&mut self) -> Option<(Link<P>, P)> {
+        let (map_handle, map) = self.get_map_mut::<P>()?;
+        let entry = map.pop()?;
+        Some((
+            Link {
+                map_handle,
+                pearl_handle: entry.handle.into_type(),
+            },
+            entry.pearl,
+        ))
+    }
+
     fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
         let anymap = self.maps.get_data_mut(link.map_handle)?;
         // SAFETY: map type is garunteed to be valid if the sparse handle passed
@@ -275,7 +313,7 @@ pub impl WorldRemove for World {
         if map.is_empty() {
             let pearl_id = TypeId::of::<P>();
             self.maps.remove(link.map_handle).unwrap();
-            let map_data = self.map_data.remove(&pearl_id).unwrap();
+            let map_data = self.map_data.swap_remove(&pearl_id).unwrap();
             for (_, remover) in map_data.events {
                 remover(self);
             }
@@ -347,7 +385,7 @@ mod sealed {
             map_data.events.insert(event_id, |world| {
                 let event_map = world.events.get_mut(&TypeId::of::<E>()).unwrap();
                 let event_map = event_map.downcast_mut::<EventMap<E>>().unwrap();
-                event_map.remove(&TypeId::of::<P>());
+                event_map.swap_remove(&TypeId::of::<P>());
             });
         }
     }

@@ -2,13 +2,13 @@ use std::time::Instant;
 
 use boba_core::pearl::SimpleEvent;
 
-pub struct MilkTeaUpdate {
+pub struct Update {
     delta_time: f32,
 }
 
-impl SimpleEvent for MilkTeaUpdate {}
+impl SimpleEvent for Update {}
 
-impl MilkTeaUpdate {
+impl Update {
     pub fn delta_time(&self) -> f32 {
         self.delta_time
     }
@@ -23,12 +23,12 @@ impl UpdateTimer {
         Self { instant: None }
     }
 
-    pub fn update(&mut self) -> MilkTeaUpdate {
+    pub fn update(&mut self) -> Update {
         let delta_time = match self.instant.replace(Instant::now()) {
             Some(last) => Instant::now().duration_since(last).as_secs_f32(),
             None => 0f32,
         };
 
-        MilkTeaUpdate { delta_time }
+        Update { delta_time }
     }
 }

@@ -53,7 +53,7 @@ impl Pearl for Transform {
         // remove the pearl from its parents children list
         if let Some(parent) = parent_option {
             let parent = ctx.world.get_mut(parent).unwrap();
-            parent.children.remove(&ctx.old_link);
+            parent.children.swap_remove(&ctx.old_link);
         }
 
         // remove the pearl from its childrens parent slot
@@ -178,7 +178,7 @@ impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
         let current_link = self.link();
         if let Some(old_parent_link) = old_parent_option {
             let mut old_parent = self.world_mut().get_view(old_parent_link).unwrap();
-            old_parent.children.remove(&current_link);
+            old_parent.children.swap_remove(&current_link);
         };
 
         // if the parent was set to None we are done
@@ -214,7 +214,7 @@ impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
                     let parent_link = parent.link();
                     parent.parent = old_parent_option;
                     let mut next_parent = parent.world_mut().get_view(next_parent_link).unwrap();
-                    next_parent.children.remove(&parent_link);
+                    next_parent.children.swap_remove(&parent_link);
                     if let Some(old_parent_link) = old_parent_option {
                         let mut old_parent =
                             next_parent.world_mut().get_view(old_parent_link).unwrap();

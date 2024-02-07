@@ -23,5 +23,5 @@ pub trait Pearl: Sized + 'static {
 }
 
 pub trait Listener<E: Event>: Pearl {
-    fn trigger(view: PearlView<Self>, data: &mut E::Data<'_>);
+    fn trigger(pearl: PearlView<Self>, event: &mut E::Data<'_>);
 }

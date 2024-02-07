@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+log = "0.4"
 winit = "0.29"
+indexmap = "2.2"
 extension-trait = "1.0"
 boba-core = { path = "../boba-core" }

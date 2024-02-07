@@ -1,13 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
-use indexmap::IndexMap;
-
 use crate::{Pearl, World};
 
-use super::{Link, WorldAccess, WorldInsert, WorldRemove};
+use super::{Link, WorldAccess, WorldInsert};
 
 pub struct PearlView<'a, P: Pearl> {
-    destroy: IndexMap<Link<()>, fn(Link<()>, &mut World)>,
     world: &'a mut World,
     link: Link<P>,
 }
@@ -26,23 +23,11 @@ impl<'a, P: Pearl> Deref for PearlView<'a, P> {
     }
 }
 
-impl<'a, P: Pearl> Drop for PearlView<'a, P> {
-    fn drop(&mut self) {
-        for (link, func) in self.destroy.iter() {
-            func(*link, self.world);
-        }
-    }
-}
-
 impl<'a, P: Pearl> PearlView<'a, P> {
     pub fn new(link: Link<P>, world: &'a mut World) -> Option<Self> {
         match world.contains(link) {
             false => None,
-            true => Some(Self {
-                world,
-                link,
-                destroy: IndexMap::new(),
-            }),
+            true => Some(Self { world, link }),
         }
     }
 
@@ -58,15 +43,7 @@ impl<'a, P: Pearl> PearlView<'a, P> {
         self.world
     }
 
-    pub fn queue_destroy(&mut self, link: Link<P>) -> bool {
-        match self.world.contains(link) {
-            false => false,
-            true => self
-                .destroy
-                .insert(link.into_type(), |link, world| {
-                    world.remove(link.into_type::<P>());
-                })
-                .is_none(),
-        }
+    pub fn destroy_self(&mut self) -> bool {
+        self.world.destroy_defer(self.link)
     }
 }

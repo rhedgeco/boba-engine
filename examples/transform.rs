@@ -8,7 +8,7 @@ pub struct TransformRotator {
 
 impl Pearl for TransformRotator {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<MilkTeaUpdate>();
+        source.listen::<Update>();
     }
 
     fn on_insert(mut ctx: InsertContext<Self>) {
@@ -19,8 +19,8 @@ impl Pearl for TransformRotator {
     }
 }
 
-impl Listener<MilkTeaUpdate> for TransformRotator {
-    fn trigger(mut view: PearlView<Self>, event: &mut MilkTeaUpdate) {
+impl Listener<Update> for TransformRotator {
+    fn trigger(mut view: PearlView<Self>, event: &mut Update) {
         view.current = (view.current + view.speed * event.delta_time()) % 360f32;
         let rotation = view.current;
         let transform = view.transform;
@@ -35,12 +35,12 @@ pub struct TransformPrinter {
 
 impl Pearl for TransformPrinter {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<MilkTeaUpdate>();
+        source.listen::<Update>();
     }
 }
 
-impl Listener<MilkTeaUpdate> for TransformPrinter {
-    fn trigger(mut view: PearlView<Self>, _: &mut MilkTeaUpdate) {
+impl Listener<Update> for TransformPrinter {
+    fn trigger(mut view: PearlView<Self>, _: &mut Update) {
         let transform = view.transform;
         let transform = view.world_mut().get_view(transform).unwrap();
         println!("Child world_pos: {}", transform.world_pos());
@@ -70,5 +70,5 @@ fn main() {
     world.insert(TransformPrinter { transform: t2 });
 
     // run headless
-    run_headless(&mut world);
+    milk_tea::run(&mut world);
 }
