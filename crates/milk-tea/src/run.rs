@@ -55,6 +55,10 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
                 }
             }
             Event::AboutToWait => {
+                // trigger a world update
+                world.trigger_simple(&mut timer.update());
+                world.flush_destroy_queue();
+
                 // create pending windows
                 while let Some((_, settings)) = world.pop::<MilkTeaWindowSettings>() {
                     match MilkTeaWindow::new(settings, target) {
@@ -70,12 +74,6 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
                         }
                     };
                 }
-
-                // trigger a world update
-                world.trigger_simple(&mut timer.update());
-
-                // flush the destroy queue after everything is finished
-                world.flush_destroy_queue();
             }
             _ => (),
         })
