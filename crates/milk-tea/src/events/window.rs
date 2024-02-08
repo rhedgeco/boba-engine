@@ -29,30 +29,6 @@ impl WindowInit {
     }
 }
 
-pub struct PreRender {
-    link: Link<MilkTeaWindow>,
-    id: MilkTeaId,
-}
-
-impl SimpleEvent for PreRender {}
-
-impl PreRender {
-    pub(crate) fn new(window: &PearlView<MilkTeaWindow>) -> Self {
-        Self {
-            link: window.link(),
-            id: window.id(),
-        }
-    }
-
-    pub fn link(&self) -> Link<MilkTeaWindow> {
-        self.link
-    }
-
-    pub fn id(&self) -> MilkTeaId {
-        self.id
-    }
-}
-
 pub struct CloseRequest {
     link: Link<MilkTeaWindow>,
     id: MilkTeaId,

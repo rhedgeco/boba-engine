@@ -13,10 +13,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use crate::events::{
-    window::{CloseRequest, PreRender},
-    Update, WindowInit,
-};
+use crate::events::{window::CloseRequest, Update, WindowInit};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MilkTeaId(usize);
@@ -112,8 +109,6 @@ impl Listener<CloseRequest> for MilkTeaWindow {
 #[extension_trait]
 pub(crate) impl MilkTeaWindowViewCrate for PearlView<'_, MilkTeaWindow> {
     fn render(&mut self) {
-        let mut before = PreRender::new(self);
-        self.world_mut().trigger_simple(&mut before);
         println!("Rendering Window {:?}", self.settings.id);
     }
 }
