@@ -293,14 +293,14 @@ pub impl WorldRemove for World {
 
     fn pop<P: Pearl>(&mut self) -> Option<(Link<P>, P)> {
         let (map_handle, map) = self.get_map_mut::<P>()?;
-        let entry = map.pop()?;
-        Some((
-            Link {
-                map_handle,
-                pearl_handle: entry.handle.into_type(),
-            },
-            entry.pearl,
-        ))
+        let pearl_handle = map.last()?.handle.into_type();
+        let link = Link {
+            map_handle,
+            pearl_handle,
+        };
+
+        let pearl = self.remove::<P>(link).unwrap();
+        Some((link, pearl))
     }
 
     fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
