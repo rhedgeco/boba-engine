@@ -3,7 +3,7 @@ use boba_core::{
     world::{Link, PearlView},
 };
 
-use crate::{window::MilkTeaId, MilkTeaWindow};
+use crate::pearls::{window::MilkTeaId, MilkTeaWindow};
 
 pub struct WindowInit {
     link: Link<MilkTeaWindow>,

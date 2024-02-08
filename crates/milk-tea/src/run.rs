@@ -15,8 +15,10 @@ use crate::{
         update::UpdateTimer,
         window::CloseRequest,
     },
-    window::{MilkTeaId, MilkTeaWindowSettings, MilkTeaWindowViewCrate},
-    MilkTeaWindow,
+    pearls::{
+        window::{MilkTeaId, MilkTeaWindowViewCrate},
+        MilkTeaWindow, MilkTeaWindowSettings,
+    },
 };
 
 #[derive(Clone, Copy)]

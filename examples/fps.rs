@@ -19,5 +19,6 @@ fn main() {
     let mut world = World::new();
     world.insert(FpsPrinter::default());
     world.insert(MilkTeaWindowSettings::default());
+    world.insert(CloseSentinel); // closes the app when there are no more windows
     milk_tea::run(&mut world);
 }

@@ -6,5 +6,6 @@ fn main() {
     world.insert(MilkTeaWindowSettings::default());
     world.insert(MilkTeaWindowSettings::default());
     world.insert(MilkTeaWindowSettings::default());
+    world.insert(CloseSentinel); // closes the app when there are no more windows
     milk_tea::run(&mut world);
 }

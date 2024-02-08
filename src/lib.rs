@@ -10,5 +10,8 @@ pub mod prelude {
     };
 
     pub use boba_3d::{glam::*, transform::TransformView, Transform};
-    pub use milk_tea::{events::Update, window::MilkTeaWindowSettings};
+    pub use milk_tea::{
+        events::Update,
+        pearls::{CloseSentinel, MilkTeaWindowSettings},
+    };
 }
