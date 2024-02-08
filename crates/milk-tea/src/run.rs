@@ -4,13 +4,17 @@ use boba_core::{
 };
 use indexmap::IndexMap;
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowId,
 };
 
 use crate::{
-    events::{update::UpdateTimer, window::CloseRequest},
+    events::{
+        app::{Init, Resume, Suspend},
+        update::UpdateTimer,
+        window::CloseRequest,
+    },
     window::{MilkTeaId, MilkTeaWindowSettings, MilkTeaWindowViewCrate},
     MilkTeaWindow,
 };
@@ -36,6 +40,9 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
     let mut timer = UpdateTimer::new();
     event_loop
         .run(move |event, target| match event {
+            Event::NewEvents(StartCause::Init) => world.trigger_simple(&mut Init::new()),
+            Event::Resumed => world.trigger_simple(&mut Resume::new()),
+            Event::Suspended => world.trigger_simple(&mut Suspend::new()),
             Event::WindowEvent { window_id, event } => {
                 let Some(entry) = window_library.get(&window_id).cloned() else {
                     log::error!("received a window event but window was not accounted for");

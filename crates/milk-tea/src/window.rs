@@ -13,7 +13,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use crate::events::{window::CloseRequest, Update, WindowInit};
+use crate::events::{window::CloseRequest, window::WindowInit, Update};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MilkTeaId(usize);
