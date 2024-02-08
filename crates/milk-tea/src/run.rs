@@ -62,8 +62,15 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
                 }
             }
             Event::AboutToWait => {
-                // trigger a world update
-                world.trigger_simple(&mut timer.update());
+                // trigger a world update and exit if needed
+                let update = &mut timer.update();
+                world.trigger_simple(update);
+                if update.will_quit() {
+                    target.exit();
+                    return;
+                }
+
+                // flush destroy queue
                 world.flush_destroy_queue();
 
                 // create pending windows

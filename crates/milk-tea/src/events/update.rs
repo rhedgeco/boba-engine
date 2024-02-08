@@ -4,6 +4,7 @@ use boba_core::pearl::SimpleEvent;
 
 pub struct Update {
     delta_time: f32,
+    exit: bool,
 }
 
 impl SimpleEvent for Update {}
@@ -11,6 +12,14 @@ impl SimpleEvent for Update {}
 impl Update {
     pub fn delta_time(&self) -> f32 {
         self.delta_time
+    }
+
+    pub fn quit_app(&mut self) {
+        self.exit = true;
+    }
+
+    pub fn will_quit(&self) -> bool {
+        self.exit
     }
 }
 
@@ -29,6 +38,9 @@ impl UpdateTimer {
             None => 0f32,
         };
 
-        Update { delta_time }
+        Update {
+            delta_time,
+            exit: false,
+        }
     }
 }
