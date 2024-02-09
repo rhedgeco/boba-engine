@@ -20,7 +20,7 @@ impl Pearl for Phoenix {
 }
 
 impl Listener<Update> for Phoenix {
-    fn trigger(mut view: PearlView<Self>, _: &mut Update) {
+    fn trigger(mut view: PearlView<Self>, _: &mut UpdateData) {
         println!(
             "A NEW LIFE BURSTS FORTH FROM THE ASHES: GENERATION {}!",
             view.0

@@ -1,0 +1,9 @@
+[package]
+name = "taro-renderer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+milk-tea = { path = "../milk-tea" }
+boba-core = { path = "../boba-core" }

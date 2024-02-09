@@ -1,31 +1,18 @@
 use boba_core::{
-    world::{Link, WorldAccess, WorldInsert, WorldRemove},
+    world::{WorldAccess, WorldRemove},
     World,
 };
-use indexmap::IndexMap;
 use winit::{
     event::{Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::WindowId,
 };
 
-use crate::{
-    events::{
-        app::{Init, Resume, Suspend},
-        update::UpdateTimer,
-        window::CloseRequest,
-    },
-    pearls::{
-        window::{MilkTeaId, MilkTeaWindowViewCrate},
-        MilkTeaWindow, MilkTeaWindowSettings,
-    },
+use crate::events::{
+    app::{Init, Resume, Suspend},
+    update::UpdateTimer,
+    window::{CloseRequest, RedrawRequest},
+    Update,
 };
-
-#[derive(Clone, Copy)]
-pub(crate) struct WindowEntry {
-    pub link: Link<MilkTeaWindow>,
-    pub id: MilkTeaId,
-}
 
 pub fn run(world: &mut World) {
     run_with_flow(world, true);
@@ -47,9 +34,6 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
         true => ControlFlow::Poll,
     });
 
-    // create a library for storing mapping between window id and other window data
-    let mut window_library = IndexMap::<WindowId, WindowEntry>::new();
-
     // create a timer to create update events every loop
     let mut timer = UpdateTimer::new();
 
@@ -58,51 +42,22 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
         Event::NewEvents(StartCause::Init) => world.trigger_simple(&mut Init::new()),
         Event::Resumed => world.trigger_simple(&mut Resume::new()),
         Event::Suspended => world.trigger_simple(&mut Suspend::new()),
-        Event::WindowEvent { window_id, event } => {
-            let Some(entry) = window_library.get(&window_id).cloned() else {
-                log::error!("received a window event but window was not accounted for");
-                return;
-            };
-
-            match event {
-                WindowEvent::RedrawRequested => {
-                    if let Some(mut window) = world.get_view(entry.link) {
-                        window.render();
-                    }
-                }
-                WindowEvent::CloseRequested => {
-                    world.trigger_simple(&mut CloseRequest::new(entry.link, entry.id));
-                }
-                _ => (),
+        Event::WindowEvent { window_id, event } => match event {
+            WindowEvent::RedrawRequested => {
+                world.trigger_simple(&mut RedrawRequest::new(window_id));
             }
-        }
+            WindowEvent::CloseRequested => {
+                world.trigger_simple(&mut CloseRequest::new(window_id));
+            }
+            _ => (),
+        },
         Event::AboutToWait => {
-            // trigger a world update and exit if needed
-            let update = &mut timer.update();
-            world.trigger_simple(update);
-            if update.will_quit() {
-                target.exit();
-                return;
-            }
+            // trigger a world update
+            let update_data = &mut timer.update(target);
+            world.trigger::<Update>(update_data);
 
-            // flush destroy queue
+            // flush destroy queue after all events are finished
             world.flush_destroy_queue();
-
-            // create pending windows
-            while let Some((_, settings)) = world.pop::<MilkTeaWindowSettings>() {
-                match MilkTeaWindow::new(settings, target) {
-                    Ok(window) => {
-                        let id = window.id();
-                        let native_id = window.native().id();
-                        let link = world.insert(window);
-                        window_library.insert(native_id, WindowEntry { link, id });
-                    }
-                    Err(e) => {
-                        log::error!("Failed to create window. Error: {e}");
-                        continue;
-                    }
-                };
-            }
         }
         _ => (),
     }) {

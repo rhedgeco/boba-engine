@@ -1,25 +1,26 @@
 use std::time::Instant;
 
-use boba_core::pearl::SimpleEvent;
+use boba_core::pearl::Event;
+use winit::event_loop::EventLoopWindowTarget;
 
-pub struct Update {
-    delta_time: f32,
-    exit: bool,
+pub struct Update;
+
+impl Event for Update {
+    type Data<'a> = UpdateData<'a>;
 }
 
-impl SimpleEvent for Update {}
+pub struct UpdateData<'a> {
+    target: &'a EventLoopWindowTarget<()>,
+    delta_time: f32,
+}
 
-impl Update {
+impl UpdateData<'_> {
     pub fn delta_time(&self) -> f32 {
         self.delta_time
     }
 
-    pub fn quit_app(&mut self) {
-        self.exit = true;
-    }
-
-    pub fn will_quit(&self) -> bool {
-        self.exit
+    pub fn window_target(&self) -> &EventLoopWindowTarget<()> {
+        self.target
     }
 }
 
@@ -32,15 +33,12 @@ impl UpdateTimer {
         Self { instant: None }
     }
 
-    pub fn update(&mut self) -> Update {
+    pub(crate) fn update<'a>(&mut self, target: &'a EventLoopWindowTarget<()>) -> UpdateData<'a> {
         let delta_time = match self.instant.replace(Instant::now()) {
             Some(last) => Instant::now().duration_since(last).as_secs_f32(),
             None => 0f32,
         };
 
-        Update {
-            delta_time,
-            exit: false,
-        }
+        UpdateData { target, delta_time }
     }
 }
