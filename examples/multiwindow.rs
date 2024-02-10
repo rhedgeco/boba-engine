@@ -1,5 +1,4 @@
 use boba_engine::prelude::*;
-use taro_renderer::pearls::camera::TaroCamera;
 
 fn main() {
     env_logger::init();
