@@ -10,7 +10,7 @@ use winit::{
 use crate::events::{
     app::{Init, Resume, Suspend},
     update::UpdateTimer,
-    window::{CloseRequest, RedrawRequest, WindowResized},
+    window::{CloseRequest, FocusChanged, RedrawRequest, WindowResized},
     Update,
 };
 
@@ -51,6 +51,9 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
             }
             WindowEvent::Resized(size) => {
                 world.trigger_simple(&mut WindowResized::new(window_id, size));
+            }
+            WindowEvent::Focused(focused) => {
+                world.trigger_simple(&mut FocusChanged::new(window_id, focused));
             }
             _ => (),
         },

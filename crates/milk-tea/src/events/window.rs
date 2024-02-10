@@ -53,3 +53,24 @@ impl WindowResized {
         self.id
     }
 }
+
+pub struct FocusChanged {
+    focused: bool,
+    id: WindowId,
+}
+
+impl SimpleEvent for FocusChanged {}
+
+impl FocusChanged {
+    pub(crate) fn new(id: WindowId, focused: bool) -> Self {
+        Self { focused, id }
+    }
+
+    pub fn focused(&self) -> bool {
+        self.focused
+    }
+
+    pub fn window_id(&self) -> WindowId {
+        self.id
+    }
+}
