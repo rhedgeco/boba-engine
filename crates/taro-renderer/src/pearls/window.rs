@@ -129,7 +129,6 @@ impl Listener<RedrawRequest> for TaroWindow {
             return;
         };
 
-        log::info!("Rendering {:?}", event.window_id());
         let surface_texture = match manager.surface.get_current_texture() {
             Ok(texture) => texture,
             Err(e) => {
