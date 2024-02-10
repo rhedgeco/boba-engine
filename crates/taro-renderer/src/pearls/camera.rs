@@ -14,7 +14,6 @@ impl Pearl for TaroCamera {}
 #[extension_trait]
 pub impl TaroCameraView for TaroCamera {
     fn render(&mut self, texture: &Texture) {
-        println!("Rendering from camera");
         let hardware = Hardware::get();
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = hardware
