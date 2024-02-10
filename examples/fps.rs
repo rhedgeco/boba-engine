@@ -17,9 +17,18 @@ impl Listener<Update> for FpsPrinter {
 fn main() {
     env_logger::init();
     let mut world = World::new();
-    world.insert(FpsPrinter::default());
-    let cam = world.insert(TaroCamera::default());
+
+    // create a transform and camera
+    let transform = world.insert(Transform::new());
+    let cam = world.insert(TaroCamera::new(transform));
+
+    // add a window and close sentinel
     world.insert(TaroWindow::new(cam));
-    world.insert(TaroSentinel); // closes the app when there are no more windows
+    world.insert(TaroSentinel);
+
+    // add the custom FPS printer pearl
+    world.insert(FpsPrinter::default());
+
+    // run the world using milk tea
     milk_tea::run(&mut world);
 }

@@ -9,6 +9,7 @@ wgpu = "0.19"
 once_cell = "1.19"
 async-once-cell = "0.5"
 extension-trait = "1.0"
+boba-3d = { path = "../boba-3d" }
 milk-tea = { path = "../milk-tea" }
 boba-core = { path = "../boba-core" }
 

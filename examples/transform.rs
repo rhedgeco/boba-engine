@@ -69,6 +69,6 @@ fn main() {
     // create transform printer
     world.insert(TransformPrinter { transform: t2 });
 
-    // run headless
+    // run the world using milk tea
     milk_tea::run(&mut world);
 }

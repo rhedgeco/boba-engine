@@ -1,18 +1,35 @@
-use boba_core::Pearl;
+use boba_3d::{glam::Mat4, Transform};
+use boba_core::{
+    world::{Link, PearlView, WorldAccess},
+    Pearl,
+};
 use extension_trait::extension_trait;
 use wgpu::Texture;
 
 use crate::Hardware;
 
-#[derive(Default)]
 pub struct TaroCamera {
-    _private: (),
+    transform: Link<Transform>,
+    position_matrix: Mat4,
 }
 
 impl Pearl for TaroCamera {}
 
+impl TaroCamera {
+    pub fn new(transform: Link<Transform>) -> Self {
+        Self {
+            transform,
+            position_matrix: Mat4::IDENTITY,
+        }
+    }
+
+    pub fn link_transform(&mut self, transform: Link<Transform>) {
+        self.transform = transform;
+    }
+}
+
 #[extension_trait]
-pub impl TaroCameraView for TaroCamera {
+pub impl TaroCameraView for PearlView<'_, TaroCamera> {
     fn render(&mut self, texture: &Texture) {
         let hardware = Hardware::get();
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -33,6 +50,12 @@ pub impl TaroCameraView for TaroCamera {
             timestamp_writes: None,
             occlusion_query_set: None,
         });
+
+        // update position matrix
+        if let Some(transform) = self.world().get(self.transform) {
+            self.position_matrix = transform.world_matrix();
+        }
+
         hardware.queue().submit(Some(encoder.finish()));
     }
 }

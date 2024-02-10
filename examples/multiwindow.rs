@@ -20,13 +20,24 @@ impl Listener<FocusChanged> for FocusPrinter {
 fn main() {
     env_logger::init();
     let mut world = World::new();
-    world.insert(FocusPrinter);
-    let cam1 = world.insert(TaroCamera::default());
-    let cam2 = world.insert(TaroCamera::default());
-    let cam3 = world.insert(TaroCamera::default());
+
+    // create a transforms and cameras
+    let t1 = world.insert(Transform::new());
+    let t2 = world.insert(Transform::new());
+    let t3 = world.insert(Transform::new());
+    let cam1 = world.insert(TaroCamera::new(t1));
+    let cam2 = world.insert(TaroCamera::new(t2));
+    let cam3 = world.insert(TaroCamera::new(t3));
+
+    // create windows and link cameras
     world.insert(TaroWindow::new(cam1));
     world.insert(TaroWindow::new(cam2));
     world.insert(TaroWindow::new(cam3));
-    world.insert(TaroSentinel); // closes the app when there are no more windows
+    world.insert(TaroSentinel);
+
+    // add custom pearl to print focus changes
+    world.insert(FocusPrinter);
+
+    // run the world using milk tea
     milk_tea::run(&mut world);
 }
