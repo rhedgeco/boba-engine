@@ -10,7 +10,7 @@ use winit::{
 use crate::events::{
     app::{Init, Resume, Suspend},
     update::UpdateTimer,
-    window::{CloseRequest, RedrawRequest},
+    window::{CloseRequest, RedrawRequest, WindowResized},
     Update,
 };
 
@@ -48,6 +48,9 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
             }
             WindowEvent::CloseRequested => {
                 world.trigger_simple(&mut CloseRequest::new(window_id));
+            }
+            WindowEvent::Resized(size) => {
+                world.trigger_simple(&mut WindowResized::new(window_id, size));
             }
             _ => (),
         },

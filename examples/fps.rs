@@ -1,4 +1,5 @@
 use boba_engine::prelude::*;
+use taro_renderer::pearls::camera::TaroCamera;
 
 #[derive(Default)]
 struct FpsPrinter;
@@ -18,7 +19,8 @@ fn main() {
     env_logger::init();
     let mut world = World::new();
     world.insert(FpsPrinter::default());
-    world.insert(TaroWindow::default());
+    let cam = world.insert(TaroCamera::default());
+    world.insert(TaroWindow::new(cam));
     world.insert(TaroSentinel); // closes the app when there are no more windows
     milk_tea::run(&mut world);
 }

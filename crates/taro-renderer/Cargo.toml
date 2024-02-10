@@ -5,5 +5,12 @@ edition = "2021"
 
 [dependencies]
 log = "0.4"
+wgpu = "0.19"
+once_cell = "1.19"
+async-once-cell = "0.5"
+extension-trait = "1.0"
 milk-tea = { path = "../milk-tea" }
 boba-core = { path = "../boba-core" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+pollster = "0.3"

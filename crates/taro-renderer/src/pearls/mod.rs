@@ -1,3 +1,4 @@
+pub mod camera;
 pub mod sentinel;
 pub mod window;
 
