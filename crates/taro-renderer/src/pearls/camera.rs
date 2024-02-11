@@ -6,11 +6,15 @@ use boba_core::{
 use extension_trait::extension_trait;
 use wgpu::Texture;
 
-use crate::Hardware;
+use crate::{events::TaroRender, Hardware};
 
 pub struct TaroCamera {
-    transform: Link<Transform>,
-    position_matrix: Mat4,
+    pub transform: Link<Transform>,
+    pub fovy: f32,
+    pub znear: f32,
+    pub zfar: f32,
+
+    view_matrix: Mat4,
 }
 
 impl Pearl for TaroCamera {}
@@ -19,27 +23,43 @@ impl TaroCamera {
     pub fn new(transform: Link<Transform>) -> Self {
         Self {
             transform,
-            position_matrix: Mat4::IDENTITY,
+            fovy: 45.,
+            znear: 0.1,
+            zfar: 1000.,
+            view_matrix: Mat4::IDENTITY,
         }
-    }
-
-    pub fn link_transform(&mut self, transform: Link<Transform>) {
-        self.transform = transform;
     }
 }
 
 #[extension_trait]
 pub impl TaroCameraView for PearlView<'_, TaroCamera> {
     fn render(&mut self, texture: &Texture) {
+        // update view matrix
+        if let Some(transform) = self.world().get(self.transform) {
+            self.view_matrix = transform.world_matrix();
+        }
+
+        // build projection matrix
+        let aspect_ratio = (texture.width() / texture.height()) as f32;
+        let fovy = self.fovy.clamp(0., 360.);
+        let znear = self.znear.max(0.001);
+        let zfar = self.zfar.max(znear);
+        let proj_matrix = Mat4::perspective_rh(fovy, aspect_ratio, znear, zfar);
+
+        // create texture view and render event
+        let tex_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut render_event =
+            TaroRender::new(self.link(), tex_view, self.view_matrix, proj_matrix);
+
+        // render the initial blank screen
         let hardware = Hardware::get();
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = hardware
             .device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
+                view: render_event.texture_view(),
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -50,12 +70,12 @@ pub impl TaroCameraView for PearlView<'_, TaroCamera> {
             timestamp_writes: None,
             occlusion_query_set: None,
         });
+        render_event.queue(0, encoder.finish());
 
-        // update position matrix
-        if let Some(transform) = self.world().get(self.transform) {
-            self.position_matrix = transform.world_matrix();
-        }
+        // trigger the render event on all listeners
+        self.world_mut().trigger_simple(&mut render_event);
 
-        hardware.queue().submit(Some(encoder.finish()));
+        // submit the encoder to be rendered
+        hardware.queue().submit(render_event);
     }
 }
