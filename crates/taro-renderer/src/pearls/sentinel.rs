@@ -3,9 +3,12 @@ use boba_core::{
     world::{PearlView, WorldAccess},
     Pearl,
 };
-use milk_tea::events::{update::UpdateData, Update};
+use milk_tea::{
+    events::{update::UpdateData, Update},
+    pearls::Window,
+};
 
-use super::TaroWindow;
+use crate::renderer::TaroRenderer;
 
 pub struct TaroSentinel;
 
@@ -17,7 +20,7 @@ impl Pearl for TaroSentinel {
 
 impl Listener<Update> for TaroSentinel {
     fn trigger(pearl: PearlView<Self>, event: &mut UpdateData) {
-        if !pearl.world().has::<TaroWindow>() {
+        if !pearl.world().has::<Window<TaroRenderer>>() {
             event.window_target().exit()
         }
     }

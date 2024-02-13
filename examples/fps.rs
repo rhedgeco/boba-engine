@@ -23,7 +23,7 @@ fn main() {
     let cam = world.insert(TaroCamera::new(transform));
 
     // add a window and close sentinel
-    world.insert(TaroWindow::new(cam));
+    world.insert(Window::new(TaroRenderer::new(cam)));
     world.insert(TaroSentinel);
 
     // add the custom FPS printer pearl

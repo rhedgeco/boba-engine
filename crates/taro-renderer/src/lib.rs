@@ -1,5 +1,5 @@
 pub mod events;
-pub mod hardware;
 pub mod pearls;
+pub mod renderer;
 
-pub use hardware::Hardware;
+pub use renderer::TaroRenderer;

@@ -6,7 +6,7 @@ use boba_core::{
 use extension_trait::extension_trait;
 use wgpu::Texture;
 
-use crate::{events::TaroRender, Hardware};
+use crate::{events::TaroRender, renderer::Hardware};
 
 pub struct TaroCamera {
     pub transform: Link<Transform>,
@@ -33,7 +33,7 @@ impl TaroCamera {
 
 #[extension_trait]
 pub impl TaroCameraView for PearlView<'_, TaroCamera> {
-    fn render(&mut self, texture: &Texture) {
+    fn render(&mut self, texture: &Texture, hardware: &Hardware) {
         // update view matrix
         if let Some(transform) = self.world().get(self.transform) {
             self.view_matrix = transform.world_matrix();
@@ -52,7 +52,6 @@ pub impl TaroCameraView for PearlView<'_, TaroCamera> {
             TaroRender::new(self.link(), tex_view, self.view_matrix, proj_matrix);
 
         // render the initial blank screen
-        let hardware = Hardware::get();
         let mut encoder = hardware
             .device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
