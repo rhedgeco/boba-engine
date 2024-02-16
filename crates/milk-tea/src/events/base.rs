@@ -123,6 +123,34 @@ impl<'a, T: MilkTeaEvent> Data<'a, T> {
         self.target.exiting()
     }
 
+    pub fn into_inner(self) -> T::Data<'a> {
+        self.data
+    }
+
+    pub fn nested_event<'d, T2: MilkTeaEvent>(&self, data: T2::Data<'d>) -> Data<'d, T2>
+    where
+        'a: 'd,
+    {
+        Data {
+            game_time: self.game_time,
+            delta_time: self.delta_time,
+            target: self.target,
+            data,
+        }
+    }
+
+    pub fn nested_simple<'d, T2: SimpleMilkTeaEvent>(&self, data: T2) -> Data<'d, T2>
+    where
+        'a: 'd,
+    {
+        Data {
+            game_time: self.game_time,
+            delta_time: self.delta_time,
+            target: self.target,
+            data,
+        }
+    }
+
     pub(crate) fn window_target(&self) -> &EventLoopWindowTarget<()> {
         self.target
     }
