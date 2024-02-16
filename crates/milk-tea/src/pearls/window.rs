@@ -12,9 +12,9 @@ use winit::{
 };
 
 use crate::events::{
-    update::UpdateData,
-    window::{CloseRequest, RedrawRequest},
-    Update,
+    base::Data,
+    window::{Close, Redraw},
+    MilkTea, Update,
 };
 
 pub trait WindowHandle: HasWindowHandle + HasDisplayHandle + Send + Sync + 'static {}
@@ -78,14 +78,14 @@ impl<T: Renderer> Window<T> {
 
 impl<T: Renderer> Pearl for Window<T> {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<RedrawRequest>();
-        source.listen::<CloseRequest>();
-        source.listen::<Update>();
+        source.listen::<MilkTea<Redraw>>();
+        source.listen::<MilkTea<Close>>();
+        source.listen::<MilkTea<Update>>();
     }
 }
 
-impl<T: Renderer> Listener<RedrawRequest> for Window<T> {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut RedrawRequest) {
+impl<T: Renderer> Listener<MilkTea<Redraw>> for Window<T> {
+    fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Redraw>) {
         let Some(window) = pearl.window.as_ref() else {
             return;
         };
@@ -98,8 +98,8 @@ impl<T: Renderer> Listener<RedrawRequest> for Window<T> {
     }
 }
 
-impl<T: Renderer> Listener<CloseRequest> for Window<T> {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut CloseRequest) {
+impl<T: Renderer> Listener<MilkTea<Close>> for Window<T> {
+    fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Close>) {
         let Some(window) = pearl.window.as_ref() else {
             return;
         };
@@ -112,8 +112,8 @@ impl<T: Renderer> Listener<CloseRequest> for Window<T> {
     }
 }
 
-impl<T: Renderer> Listener<Update> for Window<T> {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut UpdateData) {
+impl<T: Renderer> Listener<MilkTea<Update>> for Window<T> {
+    fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Update>) {
         let window = match &pearl.window {
             Some(window) => window,
             None => {

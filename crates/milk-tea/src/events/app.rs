@@ -1,10 +1,10 @@
-use boba_core::pearl::SimpleEvent;
+use super::base::SimpleMilkTeaEvent;
 
 pub struct Init {
     _private: (),
 }
 
-impl SimpleEvent for Init {}
+impl SimpleMilkTeaEvent for Init {}
 
 impl Init {
     pub(crate) fn new() -> Self {
@@ -16,7 +16,7 @@ pub struct Suspend {
     _private: (),
 }
 
-impl SimpleEvent for Suspend {}
+impl SimpleMilkTeaEvent for Suspend {}
 
 impl Suspend {
     pub(crate) fn new() -> Self {
@@ -28,7 +28,7 @@ pub struct Resume {
     _private: (),
 }
 
-impl SimpleEvent for Resume {}
+impl SimpleMilkTeaEvent for Resume {}
 
 impl Resume {
     pub(crate) fn new() -> Self {

@@ -1,13 +1,14 @@
-use boba_core::pearl::SimpleEvent;
 use winit::{dpi::PhysicalSize, window::WindowId};
 
-pub struct CloseRequest {
+use super::base::SimpleMilkTeaEvent;
+
+pub struct Close {
     id: WindowId,
 }
 
-impl SimpleEvent for CloseRequest {}
+impl SimpleMilkTeaEvent for Close {}
 
-impl CloseRequest {
+impl Close {
     pub(crate) fn new(id: WindowId) -> Self {
         Self { id }
     }
@@ -17,13 +18,13 @@ impl CloseRequest {
     }
 }
 
-pub struct RedrawRequest {
+pub struct Redraw {
     id: WindowId,
 }
 
-impl SimpleEvent for RedrawRequest {}
+impl SimpleMilkTeaEvent for Redraw {}
 
-impl RedrawRequest {
+impl Redraw {
     pub(crate) fn new(id: WindowId) -> Self {
         Self { id }
     }
@@ -33,14 +34,14 @@ impl RedrawRequest {
     }
 }
 
-pub struct WindowResized {
+pub struct Resize {
     size: PhysicalSize<u32>,
     id: WindowId,
 }
 
-impl SimpleEvent for WindowResized {}
+impl SimpleMilkTeaEvent for Resize {}
 
-impl WindowResized {
+impl Resize {
     pub(crate) fn new(id: WindowId, size: PhysicalSize<u32>) -> Self {
         Self { size, id }
     }
@@ -54,14 +55,14 @@ impl WindowResized {
     }
 }
 
-pub struct FocusChanged {
+pub struct Focus {
     focused: bool,
     id: WindowId,
 }
 
-impl SimpleEvent for FocusChanged {}
+impl SimpleMilkTeaEvent for Focus {}
 
-impl FocusChanged {
+impl Focus {
     pub(crate) fn new(id: WindowId, focused: bool) -> Self {
         Self { focused, id }
     }

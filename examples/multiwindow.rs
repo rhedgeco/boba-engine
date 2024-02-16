@@ -1,25 +1,25 @@
 use boba_engine::prelude::*;
-use milk_tea::events::window::{CloseRequest, FocusChanged};
+use milk_tea::events::window::{Close, Focus};
 
 pub struct StatePrinter;
 
 impl Pearl for StatePrinter {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<FocusChanged>();
-        source.listen::<CloseRequest>();
+        source.listen::<MilkTea<Focus>>();
+        source.listen::<MilkTea<Close>>();
     }
 }
 
-impl Listener<FocusChanged> for StatePrinter {
-    fn trigger(_: PearlView<Self>, event: &mut FocusChanged) {
+impl Listener<MilkTea<Focus>> for StatePrinter {
+    fn trigger(_: PearlView<Self>, event: &mut Data<Focus>) {
         if event.focused() {
             println!("Window {:?} focused.", event.window_id());
         }
     }
 }
 
-impl Listener<CloseRequest> for StatePrinter {
-    fn trigger(_: PearlView<Self>, event: &mut CloseRequest) {
+impl Listener<MilkTea<Close>> for StatePrinter {
+    fn trigger(_: PearlView<Self>, event: &mut Data<Close>) {
         println!("Closing Window {:?}.", event.window_id());
     }
 }

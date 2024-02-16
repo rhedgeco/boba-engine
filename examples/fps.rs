@@ -4,12 +4,12 @@ use boba_engine::prelude::*;
 struct FpsPrinter;
 impl Pearl for FpsPrinter {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<Update>();
+        source.listen::<MilkTea<Update>>();
     }
 }
 
-impl Listener<Update> for FpsPrinter {
-    fn trigger(_: PearlView<Self>, event: &mut UpdateData) {
+impl Listener<MilkTea<Update>> for FpsPrinter {
+    fn trigger(_: PearlView<Self>, event: &mut Data<Update>) {
         println!("FPS: {}", 1. / event.delta_time());
     }
 }

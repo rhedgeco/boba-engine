@@ -4,7 +4,7 @@ struct Phoenix(u64);
 
 impl Pearl for Phoenix {
     fn register(source: &mut impl EventSource<Self>) {
-        source.listen::<Update>();
+        source.listen::<MilkTea<Update>>();
     }
 
     fn on_insert(_: InsertContext<Self>) {
@@ -19,8 +19,8 @@ impl Pearl for Phoenix {
     }
 }
 
-impl Listener<Update> for Phoenix {
-    fn trigger(mut view: PearlView<Self>, _: &mut UpdateData) {
+impl Listener<MilkTea<Update>> for Phoenix {
+    fn trigger(mut view: PearlView<Self>, _: &mut Data<Update>) {
         println!(
             "A NEW LIFE BURSTS FORTH FROM THE ASHES: GENERATION {}!",
             view.0

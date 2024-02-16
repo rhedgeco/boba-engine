@@ -9,9 +9,9 @@ use winit::{
 
 use crate::events::{
     app::{Init, Resume, Suspend},
-    update::UpdateTimer,
-    window::{CloseRequest, FocusChanged, RedrawRequest, WindowResized},
-    Update,
+    base::EventTimer,
+    window::{Close, Focus, Redraw, Resize},
+    MilkTea, Update,
 };
 
 pub fn run(world: &mut World) {
@@ -35,37 +35,59 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
     });
 
     // create a timer to create update events every loop
-    let mut timer = UpdateTimer::new();
+    let mut timer = EventTimer::new();
 
     // run the event loop
-    if let Err(error) = event_loop.run(move |event, target| match event {
-        Event::NewEvents(StartCause::Init) => world.trigger_simple(&mut Init::new()),
-        Event::Resumed => world.trigger_simple(&mut Resume::new()),
-        Event::Suspended => world.trigger_simple(&mut Suspend::new()),
-        Event::WindowEvent { window_id, event } => match event {
-            WindowEvent::RedrawRequested => {
-                world.trigger_simple(&mut RedrawRequest::new(window_id));
+    if let Err(error) = event_loop.run(move |event, target| {
+        match event {
+            Event::NewEvents(StartCause::Init) => {
+                // initial update of timer to start game time
+                timer.update_timer();
+
+                // then run the init event
+                let event = &mut timer.build_simple(Init::new(), target);
+                world.trigger::<MilkTea<Init>>(event);
             }
-            WindowEvent::CloseRequested => {
-                world.trigger_simple(&mut CloseRequest::new(window_id));
+            Event::Resumed => {
+                let event = &mut timer.build_simple(Resume::new(), target);
+                world.trigger::<MilkTea<Resume>>(event);
             }
-            WindowEvent::Resized(size) => {
-                world.trigger_simple(&mut WindowResized::new(window_id, size));
+            Event::Suspended => {
+                let event = &mut timer.build_simple(Suspend::new(), target);
+                world.trigger::<MilkTea<Suspend>>(event);
             }
-            WindowEvent::Focused(focused) => {
-                world.trigger_simple(&mut FocusChanged::new(window_id, focused));
+            Event::WindowEvent { window_id, event } => match event {
+                WindowEvent::RedrawRequested => {
+                    let event = &mut timer.build_simple(Redraw::new(window_id), target);
+                    world.trigger::<MilkTea<Redraw>>(event);
+                }
+                WindowEvent::CloseRequested => {
+                    let event = &mut timer.build_simple(Close::new(window_id), target);
+                    world.trigger::<MilkTea<Close>>(event);
+                }
+                WindowEvent::Resized(size) => {
+                    let event = &mut timer.build_simple(Resize::new(window_id, size), target);
+                    world.trigger::<MilkTea<Resize>>(event);
+                }
+                WindowEvent::Focused(focused) => {
+                    let event = &mut timer.build_simple(Focus::new(window_id, focused), target);
+                    world.trigger::<MilkTea<Focus>>(event);
+                }
+                _ => (),
+            },
+            Event::AboutToWait => {
+                // trigger a world update
+                let event = &mut timer.build_simple(Update, target);
+                world.trigger::<MilkTea<Update>>(event);
+
+                // flush destroy queue after all events are finished
+                world.flush_destroy_queue();
+
+                // update the inner timer values
+                timer.update_timer();
             }
             _ => (),
-        },
-        Event::AboutToWait => {
-            // trigger a world update
-            let update_data = &mut timer.update(target);
-            world.trigger::<Update>(update_data);
-
-            // flush destroy queue after all events are finished
-            world.flush_destroy_queue();
         }
-        _ => (),
     }) {
         log::error!("Failed to execute event loop. Error: {error}");
     }
