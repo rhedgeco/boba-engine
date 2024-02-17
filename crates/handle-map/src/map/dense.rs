@@ -146,7 +146,7 @@ impl<T> DenseHandleMap<T> {
     /// Returns a copy of all the handles in this map
     #[inline]
     pub fn handles_copied(&self) -> Vec<Handle<T>> {
-        (&self.back_link).to_vec()
+        self.back_link.clone()
     }
 
     /// Returns an iterator over the reference values of a map.
