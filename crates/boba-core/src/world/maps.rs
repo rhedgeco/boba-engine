@@ -101,7 +101,7 @@ impl<P> PearlMap<P> {
     }
 
     pub fn get_index(&self, handle: Handle<P>) -> Option<usize> {
-        self.indices.get_data(handle.into_type()).copied()
+        self.indices.get(handle.into_type()).copied()
     }
 
     pub fn get_mut(&mut self, handle: Handle<P>) -> Option<&mut P> {
@@ -126,7 +126,7 @@ impl<P> PearlMap<P> {
 
         // if another pearl was swapped there, correct its index
         if let Some(entry) = self.pearls.get_mut(index) {
-            let swapped_index = self.indices.get_data_mut(entry.handle).unwrap();
+            let swapped_index = self.indices.get_mut(entry.handle).unwrap();
             *swapped_index = index;
         };
 

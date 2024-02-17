@@ -127,13 +127,13 @@ impl World {
 
     fn get_map<P: Pearl>(&self) -> Option<(Handle<MapBox>, &PearlMap<P>)> {
         let handle = self.map_data.get(&TypeId::of::<P>())?.handle;
-        let map = self.maps.get_data(handle).unwrap();
+        let map = self.maps.get(handle).unwrap();
         Some((handle, unsafe { map.as_map_ref_unchecked::<P>() }))
     }
 
     fn get_map_mut<P: Pearl>(&mut self) -> Option<(Handle<MapBox>, &mut PearlMap<P>)> {
         let handle = self.map_data.get(&TypeId::of::<P>())?.handle;
-        let map = self.maps.get_data_mut(handle).unwrap();
+        let map = self.maps.get_mut(handle).unwrap();
         Some((handle, unsafe { map.as_map_mut_unchecked::<P>() }))
     }
 }
@@ -150,7 +150,7 @@ pub impl WorldAccess for World {
 
     fn len_of<P: 'static>(&self) -> usize {
         match self.map_data.get(&TypeId::of::<P>()) {
-            Some(data) => self.maps.get_data(data.handle).unwrap().len(),
+            Some(data) => self.maps.get(data.handle).unwrap().len(),
             None => 0,
         }
     }
@@ -160,7 +160,7 @@ pub impl WorldAccess for World {
     }
 
     fn contains<P: 'static>(&self, link: Link<P>) -> bool {
-        match self.maps.get_data(link.map_handle) {
+        match self.maps.get(link.map_handle) {
             Some(map) => {
                 if map.pearl_id() != TypeId::of::<P>() {
                     return false;
@@ -172,13 +172,13 @@ pub impl WorldAccess for World {
     }
 
     fn get<P: 'static>(&self, link: Link<P>) -> Option<&P> {
-        let anymap = self.maps.get_data(link.map_handle)?;
+        let anymap = self.maps.get(link.map_handle)?;
         // SAFETY: map type is garunteed to be valid if the sparse handle is valid
         unsafe { anymap.as_map_ref_unchecked::<P>() }.get(link.pearl_handle)
     }
 
     fn get_mut<P: 'static>(&mut self, link: Link<P>) -> Option<&mut P> {
-        let anymap = self.maps.get_data_mut(link.map_handle)?;
+        let anymap = self.maps.get_mut(link.map_handle)?;
         // SAFETY: map type is garunteed to be valid if the sparse handle is valid
         unsafe { anymap.as_map_mut_unchecked::<P>() }.get_mut(link.pearl_handle)
     }
@@ -251,7 +251,7 @@ pub impl WorldInsert for World {
         let link = match self.map_data.entry(TypeId::of::<P>()) {
             E::Occupied(e) => {
                 let map_handle = e.get().handle;
-                let anymap = self.maps.get_data_mut(map_handle).unwrap();
+                let anymap = self.maps.get_mut(map_handle).unwrap();
                 let map = anymap.as_map_mut().unwrap();
                 let pearl_handle = map.insert(pearl);
                 Link {
@@ -304,7 +304,7 @@ pub impl WorldRemove for World {
     }
 
     fn remove<P: Pearl>(&mut self, link: Link<P>) -> Option<P> {
-        let anymap = self.maps.get_data_mut(link.map_handle)?;
+        let anymap = self.maps.get_mut(link.map_handle)?;
         // SAFETY: map type is garunteed to be valid if the sparse handle passed
         let map = unsafe { anymap.as_map_mut_unchecked::<P>() };
         let mut pearl = map.remove(link.pearl_handle)?;
@@ -365,7 +365,7 @@ mod sealed {
                 };
 
                 let map_handle = map_data.handle;
-                let anymap = world.maps.get_data(map_handle).unwrap();
+                let anymap = world.maps.get(map_handle).unwrap();
                 let map = unsafe { anymap.as_map_ref_unchecked::<P>() };
 
                 for handle in map.iter().map(|e| e.handle).collect::<Vec<_>>().iter() {

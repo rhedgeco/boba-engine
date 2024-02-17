@@ -1,8 +1,4 @@
-use std::{
-    ops::{Index, IndexMut},
-    slice::{Iter, IterMut},
-    vec::IntoIter,
-};
+use std::ops::{Index, IndexMut};
 
 use crate::Handle;
 
@@ -19,8 +15,8 @@ use super::{sparse::SparseHandleMap, HandleMapId};
 pub struct DenseHandleMap<T> {
     id: u16,
     link_map: SparseHandleMap<usize>,
-    back_link: Vec<Handle<usize>>,
-    data: Vec<T>,
+    back_link: Vec<Handle<T>>,
+    values: Vec<T>,
 }
 
 impl<T> Default for DenseHandleMap<T> {
@@ -31,14 +27,14 @@ impl<T> Default for DenseHandleMap<T> {
             id: HandleMapId::generate(),
             link_map: Default::default(),
             back_link: Default::default(),
-            data: Default::default(),
+            values: Default::default(),
         }
     }
 }
 
 impl<T> IndexMut<Handle<T>> for DenseHandleMap<T> {
     fn index_mut(&mut self, handle: Handle<T>) -> &mut Self::Output {
-        self.get_data_mut(handle).expect("invalid handle")
+        self.get_mut(handle).expect("invalid handle")
     }
 }
 
@@ -46,7 +42,7 @@ impl<T> Index<Handle<T>> for DenseHandleMap<T> {
     type Output = T;
 
     fn index(&self, handle: Handle<T>) -> &Self::Output {
-        self.get_data(handle).expect("invalid handle")
+        self.get(handle).expect("invalid handle")
     }
 }
 
@@ -66,13 +62,13 @@ impl<T> DenseHandleMap<T> {
     /// Returns the number of items in the map.
     #[inline]
     pub fn len(&self) -> usize {
-        self.data.len()
+        self.values.len()
     }
 
     /// Returns `true` if the map is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
+        self.values.is_empty()
     }
 
     /// Returns the handle that will be provided after `count` inserts.
@@ -86,10 +82,10 @@ impl<T> DenseHandleMap<T> {
 
     /// Inserts `data` into the map, and returns a [`Handle`] to its location.
     #[inline]
-    pub fn insert(&mut self, data: T) -> Handle<T> {
-        let handle = self.link_map.insert(self.data.len());
-        self.back_link.push(handle);
-        self.data.push(data);
+    pub fn insert(&mut self, value: T) -> Handle<T> {
+        let handle = self.link_map.insert(self.values.len());
+        self.back_link.push(handle.into_type());
+        self.values.push(value);
         handle.into_type::<T>()
     }
 
@@ -103,18 +99,18 @@ impl<T> DenseHandleMap<T> {
     ///
     /// Returns `None` if the handle is invalid.
     #[inline]
-    pub fn get_data(&self, handle: Handle<T>) -> Option<&T> {
-        let index = self.link_map.get_data(handle.into_type())?;
-        Some(&self.data[*index])
+    pub fn get(&self, handle: Handle<T>) -> Option<&T> {
+        let index = self.link_map.get(handle.into_type())?;
+        Some(&self.values[*index])
     }
 
     /// Returns a mutable reference to the data associated with `handle`.
     ///
     /// Returns `None` if the handle is invalid.
     #[inline]
-    pub fn get_data_mut(&mut self, handle: Handle<T>) -> Option<&mut T> {
-        let index = self.link_map.get_data(handle.into_type())?;
-        Some(&mut self.data[*index])
+    pub fn get_mut(&mut self, handle: Handle<T>) -> Option<&mut T> {
+        let index = self.link_map.get(handle.into_type())?;
+        Some(&mut self.values[*index])
     }
 
     /// Removes and returns the data associated with `handle` from this map.
@@ -132,34 +128,201 @@ impl<T> DenseHandleMap<T> {
         // so that handles will still be valid.
         self.back_link.swap_remove(index);
         if let Some(handle) = self.back_link.get(index) {
-            *self.link_map.get_data_mut(*handle).unwrap() = index;
+            *self.link_map.get_mut(handle.into_type()).unwrap() = index;
         }
 
         // finally, swap remove the data and return it
-        Some(self.data.swap_remove(index))
+        Some(self.values.swap_remove(index))
     }
 
-    /// Consumes the map, and returns the underlying vec of items
+    /// Returns an iterator over the handles of the map.
     #[inline]
-    pub fn into_vec(self) -> Vec<T> {
-        self.data
+    pub fn handles(&self) -> Handles<'_, T> {
+        Handles {
+            inner: self.back_link.iter(),
+        }
     }
 
-    /// Returns an iterator over the map.
+    /// Returns a copy of all the handles in this map
+    #[inline]
+    pub fn handles_copied(&self) -> Vec<Handle<T>> {
+        (&self.back_link).to_vec()
+    }
+
+    /// Returns an iterator over the reference values of a map.
+    #[inline]
+    pub fn values(&self) -> Values<'_, T> {
+        Values {
+            inner: self.values.iter(),
+        }
+    }
+
+    /// Returns an iterator over the mutable values of a map.
+    #[inline]
+    pub fn values_mut(&mut self) -> ValuesMut<'_, T> {
+        ValuesMut {
+            inner: self.values.iter_mut(),
+        }
+    }
+
+    /// Returns an iterator over the handles and reference values of the map.
     #[inline]
     pub fn iter(&self) -> Iter<'_, T> {
-        self.data.iter()
+        Iter {
+            handles: Handles {
+                inner: self.back_link.iter(),
+            },
+            values: Values {
+                inner: self.values.iter(),
+            },
+        }
     }
 
-    /// Returns an iterator that allows modifying each value.
+    /// Returns an iterator over the handles and mutable values of the map.
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        self.data.iter_mut()
+        IterMut {
+            handles: Handles {
+                inner: self.back_link.iter(),
+            },
+            values: ValuesMut {
+                inner: self.values.iter_mut(),
+            },
+        }
     }
+}
 
-    /// Returns a consuming iterator over the map.
-    #[inline]
-    pub fn into_iter(self) -> IntoIter<T> {
-        self.data.into_iter()
+pub struct Handles<'a, T> {
+    inner: core::slice::Iter<'a, Handle<T>>,
+}
+
+impl<'a, T> Handles<'a, T> {
+    pub fn empty() -> Self {
+        Self { inner: [].iter() }
+    }
+}
+
+impl<'a, T> Iterator for Handles<'a, T> {
+    type Item = Handle<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.inner.next()?.into_type())
+    }
+}
+
+pub struct Values<'a, T> {
+    inner: core::slice::Iter<'a, T>,
+}
+
+impl<'a, T> Values<'a, T> {
+    pub fn empty() -> Self {
+        Self { inner: [].iter() }
+    }
+}
+
+impl<'a, T> Iterator for Values<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+pub struct ValuesMut<'a, T> {
+    inner: core::slice::IterMut<'a, T>,
+}
+
+impl<'a, T> ValuesMut<'a, T> {
+    pub fn empty() -> Self {
+        Self {
+            inner: [].iter_mut(),
+        }
+    }
+}
+
+impl<'a, T> Iterator for ValuesMut<'a, T> {
+    type Item = &'a mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+pub struct Iter<'a, T> {
+    handles: Handles<'a, T>,
+    values: Values<'a, T>,
+}
+
+impl<'a, T> Iter<'a, T> {
+    pub fn empty() -> Self {
+        Self {
+            handles: Handles::empty(),
+            values: Values::empty(),
+        }
+    }
+}
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = (Handle<T>, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some((
+            self.handles.next()?.into_type(),
+            self.values.next().unwrap(),
+        ))
+    }
+}
+
+pub struct IterMut<'a, T> {
+    handles: Handles<'a, T>,
+    values: ValuesMut<'a, T>,
+}
+
+impl<'a, T> IterMut<'a, T> {
+    pub fn empty() -> Self {
+        Self {
+            handles: Handles::empty(),
+            values: ValuesMut::empty(),
+        }
+    }
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = (Handle<T>, &'a mut T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some((
+            self.handles.next()?.into_type(),
+            self.values.next().unwrap(),
+        ))
+    }
+}
+
+pub struct IntoIter<T> {
+    handles: std::vec::IntoIter<Handle<T>>,
+    values: std::vec::IntoIter<T>,
+}
+
+impl<T> IntoIterator for DenseHandleMap<T> {
+    type Item = (Handle<T>, T);
+
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            handles: self.back_link.into_iter(),
+            values: self.values.into_iter(),
+        }
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = (Handle<T>, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some((
+            self.handles.next()?.into_type(),
+            self.values.next().unwrap(),
+        ))
     }
 }
