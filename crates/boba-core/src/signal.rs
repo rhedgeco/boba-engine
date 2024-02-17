@@ -32,8 +32,8 @@ impl<T: 'static> Signal<T> {
 
 #[extension_trait]
 pub impl<T> SignalSend<T> for Signal<T> {
-    fn commands(&self, data: T) -> SignalCommands<T> {
-        SignalCommands {
+    fn command(&self, data: T) -> SignalCommand<T> {
+        SignalCommand {
             data,
             listeners: self.listeners.clone(),
         }
@@ -64,12 +64,12 @@ pub impl<T: 'static> SignalRegister<T> for Signal<T> {
     }
 }
 
-pub struct SignalCommands<T> {
+pub struct SignalCommand<T> {
     data: T,
     listeners: Vec<Rc<dyn Fn(&mut WorldQueue, &mut T)>>,
 }
 
-impl<T> SignalCommands<T> {
+impl<T> SignalCommand<T> {
     pub fn send(mut self, world: &mut WorldQueue) {
         for listener in self.listeners {
             listener(world, &mut self.data);

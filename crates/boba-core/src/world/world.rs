@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    fmt::{Debug, Display},
     hash::Hash,
     ops::{Deref, DerefMut},
 };
@@ -13,7 +14,7 @@ use indexmap::IndexMap;
 
 use crate::{
     pearl::{Event, SimpleEvent},
-    signal::SignalCommands,
+    signal::SignalCommand,
     world::WorldQueue,
     Pearl,
 };
@@ -46,6 +47,23 @@ impl<P> Eq for Link<P> {}
 impl<P> PartialEq for Link<P> {
     fn eq(&self, other: &Self) -> bool {
         self.map_handle == other.map_handle && self.pearl_handle == other.pearl_handle
+    }
+}
+
+impl<P> Debug for Link<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Link")
+            .field("map_handle", &self.map_handle)
+            .field("pearl_handle", &self.pearl_handle)
+            .finish()
+    }
+}
+
+impl<P> Display for Link<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let id = self.pearl_handle.id();
+        let pearl_name = core::any::type_name::<P>();
+        write!(f, "Link<{pearl_name}>({id})")
     }
 }
 
@@ -304,9 +322,9 @@ impl World {
         }
     }
 
-    pub fn send_signal<T: 'static>(&mut self, commands: SignalCommands<T>) {
+    pub fn send_signal<T: 'static>(&mut self, command: SignalCommand<T>) {
         let mut queue = WorldQueue::new(self);
-        commands.send(&mut queue);
+        command.send(&mut queue);
     }
 }
 
