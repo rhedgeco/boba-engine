@@ -2,7 +2,8 @@ use boba_core::world::{Link, PearlView};
 use milk_tea::pearls::window::{Renderer, Window, WindowHandle};
 use once_cell::sync::OnceCell;
 use wgpu::{
-    Adapter, Device, Instance, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
+    Adapter, Device, Instance, PresentMode, Queue, RequestAdapterOptions, Surface,
+    SurfaceConfiguration,
 };
 
 use crate::pearls::{camera::TaroCameraView, TaroCamera};
@@ -62,6 +63,7 @@ impl Renderer for TaroRenderer {
             None => match surface.get_default_config(hardware.adapter(), width, height) {
                 Some(config) => {
                     let config = renderer.config.insert(config);
+                    config.present_mode = PresentMode::AutoNoVsync;
                     surface.configure(hardware.device(), config);
                 }
                 None => {
