@@ -2,7 +2,7 @@ use boba_engine::prelude::*;
 
 #[derive(Default)]
 pub struct SignalEmitter {
-    signal: Signal<String>,
+    signal: SignalBuilder<String>,
 }
 
 impl Pearl for SignalEmitter {
@@ -13,8 +13,8 @@ impl Pearl for SignalEmitter {
 
 impl Listener<MilkTea<Update>> for SignalEmitter {
     fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Update>) {
-        let command = pearl.signal.command(format!("Hello, World!"));
-        pearl.world_mut().send_signal(command);
+        let signal = pearl.signal.build(format!("Hello, World!"));
+        pearl.world_mut().send_signal(signal);
         event.exit_app();
     }
 }
