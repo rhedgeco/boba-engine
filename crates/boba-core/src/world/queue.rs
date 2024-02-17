@@ -2,7 +2,6 @@ use indexmap::IndexSet;
 
 use crate::{
     pearl::{Event, SimpleEvent},
-    signal::SignalCommand,
     Pearl, World,
 };
 
@@ -102,10 +101,6 @@ impl<'a> WorldQueue<'a> {
 
     pub fn trigger<E: Event>(&mut self, data: &mut E::Data<'_>) {
         World::trigger_nested::<E>(self, data);
-    }
-
-    pub fn send_signal<T: 'static>(&mut self, command: SignalCommand<T>) {
-        command.send(self);
     }
 
     pub fn defer(&mut self, f: impl FnOnce(&mut World) + 'static) {

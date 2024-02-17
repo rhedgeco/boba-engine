@@ -11,4 +11,5 @@ env_logger = "0.11"
 boba-3d = { path = "./crates/boba-3d" }
 milk-tea = { path = "./crates/milk-tea" }
 boba-core = { path = "./crates/boba-core" }
+boba-signal = { path = "./crates/boba-signal" }
 taro-renderer = { path = "./crates/taro-renderer" }

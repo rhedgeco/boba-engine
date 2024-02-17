@@ -1,12 +1,11 @@
 use std::rc::Rc;
 
+use boba_core::{
+    world::{Link, PearlView, WorldQueue},
+    Pearl, World,
+};
 use extension_trait::extension_trait;
 use indexmap::IndexSet;
-
-use crate::{
-    world::{Link, PearlView, WorldQueue},
-    Pearl,
-};
 
 pub(crate) type Listener<T> = Rc<dyn Fn(&mut WorldQueue, &mut T)>;
 
@@ -28,11 +27,8 @@ impl<T: 'static> Signal<T> {
     pub fn new() -> Self {
         Self::default()
     }
-}
 
-#[extension_trait]
-pub impl<T> SignalSend<T> for Signal<T> {
-    fn command(&self, data: T) -> SignalCommand<T> {
+    pub fn command(&self, data: T) -> SignalCommand<T> {
         SignalCommand {
             data,
             listeners: self.listeners.clone(),
@@ -74,5 +70,19 @@ impl<T> SignalCommand<T> {
         for listener in self.listeners {
             listener(world, &mut self.data);
         }
+    }
+}
+
+#[extension_trait]
+pub impl<T> SignalSender<T> for WorldQueue<'_> {
+    fn send_signal(&mut self, command: SignalCommand<T>) {
+        command.send(self)
+    }
+}
+
+impl<T> SignalSender<T> for World {
+    fn send_signal(&mut self, command: SignalCommand<T>) {
+        let mut queue = WorldQueue::new(self);
+        queue.send_signal(command);
     }
 }
