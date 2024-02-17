@@ -1,6 +1,9 @@
-use std::{hash::Hash, marker::PhantomData};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+    marker::PhantomData,
+};
 
-#[derive(Debug)]
 pub struct Handle<T> {
     raw: u64,
     _type: PhantomData<*const T>,
@@ -28,6 +31,20 @@ impl<T> PartialEq for Handle<T> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
+    }
+}
+
+impl<T> Debug for Handle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Handle").field("raw", &self.raw).finish()
+    }
+}
+
+impl<T> Display for Handle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let id = self.id();
+        let name = core::any::type_name::<T>();
+        write!(f, "Handle<{name}> {{ id: {id} }}")
     }
 }
 
