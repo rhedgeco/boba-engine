@@ -68,6 +68,10 @@ impl<P> Display for Link<P> {
 }
 
 impl<P> Link<P> {
+    pub fn id(&self) -> u64 {
+        self.pearl_handle.id()
+    }
+
     #[doc(hidden)]
     pub fn into_type<P2>(&self) -> Link<P2> {
         Link {

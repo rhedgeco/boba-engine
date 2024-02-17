@@ -32,7 +32,8 @@ fn main() {
     // create signal sender
     let mut sender = SignalSender::default();
     sender.signal.add_listener(recv, |pearl, data| {
-        println!("Pearl {} recieved signal '{data}'.", pearl.link());
+        let id = pearl.link().id();
+        println!("SignalReciever({id}) got signal '{data}'.");
     });
     world.insert(sender);
 
