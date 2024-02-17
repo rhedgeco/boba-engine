@@ -13,6 +13,7 @@ use indexmap::IndexMap;
 
 use crate::{
     pearl::{Event, SimpleEvent},
+    signal::SignalCommands,
     world::WorldQueue,
     Pearl,
 };
@@ -301,6 +302,11 @@ impl World {
         for runner in runners {
             runner(queue, data);
         }
+    }
+
+    pub fn send_signal<T: 'static>(&mut self, commands: SignalCommands<T>) {
+        let mut queue = WorldQueue::new(self);
+        commands.send(&mut queue);
     }
 }
 
