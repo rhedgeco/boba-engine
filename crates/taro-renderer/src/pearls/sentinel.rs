@@ -1,6 +1,6 @@
 use boba_core::{
     pearl::{EventSource, Listener},
-    world::{PearlView, WorldAccess},
+    world::PearlView,
     Pearl,
 };
 use milk_tea::{

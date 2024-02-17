@@ -1,7 +1,4 @@
-use boba_core::{
-    world::{WorldAccess, WorldRemove},
-    World,
-};
+use boba_core::World;
 use winit::{
     event::{Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -79,9 +76,6 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
                 // trigger a world update
                 let event = &mut timer.build_simple(Update, target);
                 world.trigger::<MilkTea<Update>>(event);
-
-                // flush destroy queue after all events are finished
-                world.flush_destroy_queue();
 
                 // update the inner timer values
                 timer.update_timer();

@@ -7,14 +7,14 @@ impl Pearl for Phoenix {
         source.listen::<MilkTea<Update>>();
     }
 
-    fn on_insert(_: InsertContext<Self>) {
+    fn on_insert(_: Inserted<Self>) {
         println!("A FIRE IS STARTED!");
     }
 
-    fn on_remove(context: RemoveContext<Self>) {
+    fn on_remove(pearl: Removed<Self>) {
         println!(
             "THE DEATH OF GENERATION {} WILL BRING LIFE TO ANOTHER!",
-            context.pearl.0
+            pearl.0
         );
     }
 }
@@ -27,7 +27,7 @@ impl Listener<MilkTea<Update>> for Phoenix {
         );
         let next_phoenix = Phoenix(view.0 + 1);
         view.world_mut().insert(next_phoenix);
-        view.defer_destroy_self();
+        view.destroy_self();
     }
 }
 

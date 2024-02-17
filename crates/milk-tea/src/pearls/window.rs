@@ -108,7 +108,7 @@ impl<T: Renderer> Listener<MilkTea<Close>> for Window<T> {
             return;
         }
 
-        pearl.defer_destroy_self();
+        pearl.destroy_self();
     }
 }
 
@@ -122,14 +122,14 @@ impl<T: Renderer> Listener<MilkTea<Update>> for Window<T> {
                     Ok(window) => Arc::new(window),
                     Err(e) => {
                         log::error!("Failed to create window. Error: {e}");
-                        pearl.defer_destroy_self();
+                        pearl.destroy_self();
                         return;
                     }
                 };
 
                 if !pearl.renderer.load(window.clone()) {
                     log::error!("Failed to load window renderer. Destroying window.");
-                    pearl.defer_destroy_self();
+                    pearl.destroy_self();
                     return;
                 }
 

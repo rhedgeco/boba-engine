@@ -1,4 +1,4 @@
-use boba_core::world::{Link, PearlView, WorldAccess};
+use boba_core::world::{Link, PearlView};
 use milk_tea::pearls::window::{Renderer, Window, WindowHandle};
 use once_cell::sync::OnceCell;
 use wgpu::{
@@ -80,7 +80,7 @@ impl Renderer for TaroRenderer {
             }
         };
 
-        let Some(mut camera) = pearl.world_mut().get_view(cam_link) else {
+        let Some(mut camera) = pearl.get_view(cam_link) else {
             log::warn!("Tried to render window but camera was invalid.");
             return;
         };

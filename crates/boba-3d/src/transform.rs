@@ -1,5 +1,5 @@
 use boba_core::{
-    world::{InsertContext, Link, PearlView, RemoveContext, WorldAccess},
+    world::{Inserted, Link, PearlView, Removed},
     Pearl,
 };
 use extension_trait::extension_trait;
@@ -42,23 +42,24 @@ impl Default for Transform {
 }
 
 impl Pearl for Transform {
-    fn on_insert(mut ctx: InsertContext<Self>) {
-        ctx.view.pending_sync = false;
+    fn on_insert(mut pearl: Inserted<Self>) {
+        pearl.pending_sync = false;
     }
 
-    fn on_remove(ctx: RemoveContext<Self>) {
+    fn on_remove(mut pearl: Removed<Self>) {
         // remove the parent
-        let parent_option = ctx.pearl.parent.take();
+        let parent_option = pearl.parent.take();
 
         // remove the pearl from its parents children list
         if let Some(parent) = parent_option {
-            let parent = ctx.world.get_mut(parent).unwrap();
-            parent.children.swap_remove(&ctx.old_link);
+            let old_link = pearl.old_link();
+            let parent = pearl.world_mut().get_mut(parent).unwrap();
+            parent.children.swap_remove(&old_link);
         }
 
         // remove the pearl from its childrens parent slot
-        for child in ctx.pearl.children.drain(..) {
-            ctx.world.get_mut(child).unwrap().parent = parent_option;
+        for child in pearl.children.drain(..).collect::<Vec<_>>() {
+            pearl.world_mut().get_mut(child).unwrap().parent = parent_option;
         }
     }
 }
@@ -164,7 +165,7 @@ impl Transform {
 }
 
 #[extension_trait]
-impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
+impl<'a, 'world> PrivateTransformView<'a> for PearlView<'a, 'world, Transform> {
     fn set_parent_no_sync(&mut self, parent_option: Option<Link<Transform>>) -> bool {
         // early return if the parent is Some and doesnt exist
         if parent_option.is_some_and(|parent| !self.world().contains(parent)) {
@@ -177,7 +178,7 @@ impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
         // if the old parent existed, remove the child from its children list
         let current_link = self.link();
         if let Some(old_parent_link) = old_parent_option {
-            let mut old_parent = self.world_mut().get_view(old_parent_link).unwrap();
+            let mut old_parent = self.get_view(old_parent_link).unwrap();
             old_parent.children.swap_remove(&current_link);
         };
 
@@ -187,7 +188,7 @@ impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
         };
 
         // add the child to the new parents children list
-        let mut parent = self.world_mut().get_view(parent_link).unwrap();
+        let mut parent = self.get_view(parent_link).unwrap();
         parent.children.insert(current_link);
 
         // resolve recusrive tree branches by walking up each parent
@@ -204,7 +205,7 @@ impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
                 None => (),
                 // if next parent is not the source node, recurse up and check the next parent in the chain
                 Some(next_parent_link) if next_parent_link != source => {
-                    let mut next_parent = parent.world_mut().get_view(next_parent_link).unwrap();
+                    let mut next_parent = parent.get_view(next_parent_link).unwrap();
                     resolve_recursive(&mut next_parent, source, old_parent_option)
                 }
                 // if a recursive loop was found, remove the recursive child from the source node
@@ -213,11 +214,10 @@ impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
                 Some(next_parent_link) => {
                     let parent_link = parent.link();
                     parent.parent = old_parent_option;
-                    let mut next_parent = parent.world_mut().get_view(next_parent_link).unwrap();
+                    let mut next_parent = parent.get_view(next_parent_link).unwrap();
                     next_parent.children.swap_remove(&parent_link);
                     if let Some(old_parent_link) = old_parent_option {
-                        let mut old_parent =
-                            next_parent.world_mut().get_view(old_parent_link).unwrap();
+                        let mut old_parent = next_parent.get_view(old_parent_link).unwrap();
                         old_parent.children.insert(parent_link);
                     }
                 }
@@ -227,13 +227,13 @@ impl<'a> PrivateTransformView<'a> for PearlView<'a, Transform> {
 }
 
 #[extension_trait]
-pub impl<'a> TransformView<'a> for PearlView<'a, Transform> {
-    fn parent(&mut self) -> Option<PearlView<Transform>> {
+pub impl<'a, 'world> TransformView<'a, 'world> for PearlView<'a, 'world, Transform> {
+    fn parent(&mut self) -> Option<PearlView<'_, 'world, Transform>> {
         let parent = self.parent?;
-        Some(self.world_mut().get_view(parent).unwrap())
+        Some(self.get_view(parent).unwrap())
     }
 
-    fn walk_children(&mut self) -> ChildWalker<'_, 'a> {
+    fn walk_children(&mut self) -> ChildWalker<'_, 'a, 'world> {
         ChildWalker::new(self)
     }
 
@@ -303,14 +303,14 @@ pub impl<'a> TransformView<'a> for PearlView<'a, Transform> {
     }
 }
 
-pub struct ChildWalker<'a, 'source> {
-    view: &'a mut PearlView<'source, Transform>,
+pub struct ChildWalker<'a, 'source, 'world> {
+    view: &'a mut PearlView<'source, 'world, Transform>,
     children: Box<[Link<Transform>]>,
     current: usize,
 }
 
-impl<'a, 'source> ChildWalker<'a, 'source> {
-    pub fn new(view: &'a mut PearlView<'source, Transform>) -> Self {
+impl<'a, 'source, 'world> ChildWalker<'a, 'source, 'world> {
+    pub fn new(view: &'a mut PearlView<'source, 'world, Transform>) -> Self {
         let children = view.child_links().copied().collect();
         Self {
             view,
@@ -319,9 +319,9 @@ impl<'a, 'source> ChildWalker<'a, 'source> {
         }
     }
 
-    pub fn walk_next(&mut self) -> Option<PearlView<Transform>> {
+    pub fn walk_next(&mut self) -> Option<PearlView<'_, 'world, Transform>> {
         let link = *self.children.get(self.current)?;
         self.current += 1;
-        Some(self.view.world_mut().get_view(link).unwrap())
+        Some(self.view.get_view(link).unwrap())
     }
 }

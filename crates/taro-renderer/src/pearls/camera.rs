@@ -1,6 +1,6 @@
 use boba_3d::{glam::Mat4, Transform};
 use boba_core::{
-    world::{Link, PearlView, WorldAccess},
+    world::{Link, PearlView},
     Pearl,
 };
 use extension_trait::extension_trait;
@@ -32,7 +32,7 @@ impl TaroCamera {
 }
 
 #[extension_trait]
-pub impl TaroCameraView for PearlView<'_, TaroCamera> {
+pub impl TaroCameraView for PearlView<'_, '_, TaroCamera> {
     fn render(&mut self, texture: &Texture, hardware: &Hardware) {
         // update view matrix
         if let Some(transform) = self.world().get(self.transform) {

@@ -11,10 +11,10 @@ impl Pearl for TransformRotator {
         source.listen::<MilkTea<Update>>();
     }
 
-    fn on_insert(mut ctx: InsertContext<Self>) {
-        let rotation = ctx.view.current;
-        let transform = ctx.view.transform;
-        let mut transform = ctx.view.world_mut().get_view(transform).unwrap();
+    fn on_insert(mut pearl: Inserted<Self>) {
+        let rotation = pearl.current;
+        let transform = pearl.transform;
+        let mut transform = pearl.get_view(transform).unwrap();
         transform.set_local_rot(Quat::from_rotation_z(rotation.to_radians()))
     }
 }
@@ -24,7 +24,7 @@ impl Listener<MilkTea<Update>> for TransformRotator {
         view.current = (view.current + view.speed * event.delta_time()) % 360f32;
         let rotation = view.current;
         let transform = view.transform;
-        let mut transform = view.world_mut().get_view(transform).unwrap();
+        let mut transform = view.get_view(transform).unwrap();
         transform.set_local_rot(Quat::from_rotation_z(rotation.to_radians()));
     }
 }
@@ -42,7 +42,7 @@ impl Pearl for TransformPrinter {
 impl Listener<MilkTea<Update>> for TransformPrinter {
     fn trigger(mut view: PearlView<Self>, _: &mut Data<Update>) {
         let transform = view.transform;
-        let transform = view.world_mut().get_view(transform).unwrap();
+        let transform = view.get_view(transform).unwrap();
         println!("Child world_pos: {}", transform.world_pos());
     }
 }
