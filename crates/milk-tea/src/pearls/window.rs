@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use boba_core::{
     pearl::{EventSource, Listener},
-    world::PearlView,
+    world::{PearlView, WorldQueue},
     Pearl,
 };
 use winit::{
@@ -113,30 +113,36 @@ impl<T: Renderer> Listener<MilkTea<Close>> for Window<T> {
 }
 
 impl<T: Renderer> Listener<MilkTea<Update>> for Window<T> {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut MilkTea<Update>) {
-        let window = match &pearl.window {
-            Some(window) => window,
+    fn trigger(pearl: PearlView<Self>, event: &mut MilkTea<Update>) {
+        match &pearl.window {
+            Some(window) => window.request_redraw(),
             None => {
-                let builder = pearl.builder.clone();
-                let window = match builder.build(event.window_target()) {
-                    Ok(window) => Arc::new(window),
-                    Err(e) => {
-                        log::error!("Failed to create window. Error: {e}");
+                let link = pearl.link();
+                event.target_defer(move |world, target| {
+                    let mut queue = WorldQueue::new(world);
+                    let Some(mut pearl) = PearlView::new(link, &mut queue) else {
+                        return;
+                    };
+
+                    let builder = pearl.builder.clone();
+                    let window = match builder.build(target) {
+                        Ok(window) => Arc::new(window),
+                        Err(e) => {
+                            log::error!("Failed to create window. Error: {e}");
+                            pearl.destroy_self();
+                            return;
+                        }
+                    };
+
+                    if !pearl.renderer.load(window.clone()) {
+                        log::error!("Failed to load window renderer. Destroying window.");
                         pearl.destroy_self();
                         return;
                     }
-                };
 
-                if !pearl.renderer.load(window.clone()) {
-                    log::error!("Failed to load window renderer. Destroying window.");
-                    pearl.destroy_self();
-                    return;
-                }
-
-                pearl.window.insert(window)
+                    pearl.window = Some(window);
+                });
             }
         };
-
-        window.request_redraw();
     }
 }

@@ -57,21 +57,34 @@ impl<'a> Drop for MilkTeaExecutor<'a> {
 impl<'a> MilkTeaExecutor<'a> {
     pub fn trigger<T: 'static>(&self, world: &mut World, event: T) -> T {
         let mut milk_tea = MilkTea {
-            target: self.target,
+            target_defer: Vec::new(),
             delta_time: self.delta_time,
             game_time: self.game_time,
+            exiting: self.target.exiting(),
             event,
         };
 
         world.trigger(&mut milk_tea);
+
+        // run deferred functions
+        for deferred in milk_tea.target_defer {
+            deferred(world, self.target);
+        }
+
+        // trigger app exit
+        if milk_tea.exiting {
+            self.target.exit()
+        }
+
         milk_tea.event
     }
 }
 
 pub struct MilkTea<T> {
-    target: *const EventLoopWindowTarget<()>,
+    target_defer: Vec<Box<dyn FnOnce(&mut World, &EventLoopWindowTarget<()>)>>,
     delta_time: f32,
     game_time: f32,
+    exiting: bool,
     event: T,
 }
 
@@ -98,19 +111,18 @@ impl<T> MilkTea<T> {
         self.delta_time
     }
 
-    pub fn exit_app(&self) {
-        self.window_target().exit()
+    pub fn exit_app(&mut self) {
+        self.exiting = true;
     }
 
     pub fn exiting(&self) -> bool {
-        self.window_target().exiting()
+        self.exiting
     }
 
-    pub(crate) fn window_target(&self) -> &EventLoopWindowTarget<()> {
-        // SAFETY: MilkTea cannot be constructed externally
-        // and is only valid within the scope of MilkTeaExecutor.
-        // Since the target reference is valid during the length of MilkTeaExecutor,
-        // this will always be safe. This is needed to lift the liftime bound from MilkTea.
-        unsafe { &*self.target }
+    pub(crate) fn target_defer(
+        &mut self,
+        defer: impl FnOnce(&mut World, &EventLoopWindowTarget<()>) + 'static,
+    ) {
+        self.target_defer.push(Box::new(defer));
     }
 }
