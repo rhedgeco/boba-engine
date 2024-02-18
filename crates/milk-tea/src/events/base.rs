@@ -1,112 +1,105 @@
 use std::{
-    marker::PhantomData,
     ops::{Deref, DerefMut},
     time::Instant,
 };
 
-use boba_core::pearl::Event;
+use boba_core::World;
 use winit::event_loop::EventLoopWindowTarget;
 
-pub trait MilkTeaEvent: 'static {
-    type Data<'a>;
+pub struct Update {
+    _private: (),
 }
 
-pub trait SimpleMilkTeaEvent: 'static {}
-impl<T: SimpleMilkTeaEvent> MilkTeaEvent for T {
-    type Data<'a> = Self;
+impl Update {
+    pub(crate) fn new() -> Self {
+        Self { _private: () }
+    }
 }
 
-pub struct Update;
-impl SimpleMilkTeaEvent for Update {}
+struct TimerData {
+    start: Instant,
+    update: Instant,
+}
 
 pub(crate) struct EventTimer {
-    start_time: Option<Instant>,
-    update_time: Instant,
-    delta_time: f32,
-    game_time: f32,
+    timer_data: Option<TimerData>,
 }
 
 impl EventTimer {
     pub fn new() -> Self {
-        Self {
-            start_time: None,
-            update_time: Instant::now(),
-            delta_time: 0.,
-            game_time: 0.,
-        }
+        Self { timer_data: None }
     }
 
-    pub fn update_timer(&mut self) {
+    pub fn next<'a>(&mut self, target: &'a EventLoopWindowTarget<()>) -> MilkTeaExecutor<'a> {
         let now = Instant::now();
-        self.game_time = match self.start_time {
-            Some(start_time) => now.duration_since(start_time).as_secs_f32(),
-            None => {
-                self.start_time = Some(now);
-                0.
-            }
+        let Some(timer_data) = &mut self.timer_data else {
+            self.timer_data = Some(TimerData {
+                start: now,
+                update: now,
+            });
+            return MilkTeaExecutor {
+                target,
+                delta_time: 0.,
+                game_time: 0.,
+            };
         };
 
-        self.delta_time = now.duration_since(self.update_time).as_secs_f32();
-        self.update_time = now;
-    }
-
-    // pub fn build<'a, T: MilkTeaEvent>(
-    //     &self,
-    //     data: T::Data<'a>,
-    //     target: &'a EventLoopWindowTarget<()>,
-    // ) -> Data<'a, T> {
-    //     Data {
-    //         game_time: self.game_time,
-    //         delta_time: self.delta_time,
-    //         target,
-    //         data,
-    //     }
-    // }
-
-    pub fn build_simple<'a, T: SimpleMilkTeaEvent>(
-        &self,
-        data: T,
-        target: &'a EventLoopWindowTarget<()>,
-    ) -> Data<'a, T> {
-        Data {
-            game_time: self.game_time,
-            delta_time: self.delta_time,
+        let builder = MilkTeaExecutor {
             target,
-            data,
-        }
+            delta_time: now.duration_since(timer_data.update).as_secs_f32(),
+            game_time: now.duration_since(timer_data.start).as_secs_f32(),
+        };
+        timer_data.update = now;
+        builder
     }
 }
 
-pub struct MilkTea<T: MilkTeaEvent> {
-    _type: PhantomData<T>,
-}
-
-impl<T: MilkTeaEvent> Event for MilkTea<T> {
-    type Data<'a> = Data<'a, T>;
-}
-
-pub struct Data<'a, T: MilkTeaEvent> {
-    game_time: f32,
-    delta_time: f32,
+pub(crate) struct MilkTeaExecutor<'a> {
     target: &'a EventLoopWindowTarget<()>,
-    data: T::Data<'a>,
+    delta_time: f32,
+    game_time: f32,
 }
 
-impl<'a, T: MilkTeaEvent> DerefMut for Data<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
+impl<'a> Drop for MilkTeaExecutor<'a> {
+    fn drop(&mut self) {}
+}
+
+impl<'a> MilkTeaExecutor<'a> {
+    pub fn trigger<T: 'static>(&self, world: &mut World, event: T) -> T {
+        let mut milk_tea = MilkTea {
+            target: self.target,
+            delta_time: self.delta_time,
+            game_time: self.game_time,
+            event,
+        };
+
+        world.trigger(&mut milk_tea);
+        milk_tea.event
     }
 }
 
-impl<'a, T: MilkTeaEvent> Deref for Data<'a, T> {
-    type Target = T::Data<'a>;
+pub struct MilkTea<T> {
+    target: *const EventLoopWindowTarget<()>,
+    delta_time: f32,
+    game_time: f32,
+    event: T,
+}
+
+impl<'a, T> DerefMut for MilkTea<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.event
+    }
+}
+
+impl<'a, T> Deref for MilkTea<T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.data
+        &self.event
     }
 }
 
-impl<'a, T: MilkTeaEvent> Data<'a, T> {
+impl<T> MilkTea<T> {
     pub fn game_time(&self) -> f32 {
         self.game_time
     }
@@ -116,42 +109,18 @@ impl<'a, T: MilkTeaEvent> Data<'a, T> {
     }
 
     pub fn exit_app(&self) {
-        self.target.exit()
+        self.window_target().exit()
     }
 
-    pub fn is_exiting(&self) -> bool {
-        self.target.exiting()
-    }
-
-    pub fn into_inner(self) -> T::Data<'a> {
-        self.data
-    }
-
-    pub fn nested_event<'d, T2: MilkTeaEvent>(&self, data: T2::Data<'d>) -> Data<'d, T2>
-    where
-        'a: 'd,
-    {
-        Data {
-            game_time: self.game_time,
-            delta_time: self.delta_time,
-            target: self.target,
-            data,
-        }
-    }
-
-    pub fn nested_simple<'d, T2: SimpleMilkTeaEvent>(&self, data: T2) -> Data<'d, T2>
-    where
-        'a: 'd,
-    {
-        Data {
-            game_time: self.game_time,
-            delta_time: self.delta_time,
-            target: self.target,
-            data,
-        }
+    pub fn exiting(&self) -> bool {
+        self.window_target().exiting()
     }
 
     pub(crate) fn window_target(&self) -> &EventLoopWindowTarget<()> {
-        self.target
+        // SAFETY: MilkTea cannot be constructed externally
+        // and is only valid within the scope of MilkTeaExecutor.
+        // Since the target reference is valid during the length of MilkTeaExecutor,
+        // this will always be safe. This is needed to lift the liftime bound from MilkTea.
+        unsafe { &*self.target }
     }
 }

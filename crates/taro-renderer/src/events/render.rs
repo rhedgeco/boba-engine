@@ -1,5 +1,5 @@
 use boba_3d::glam::Mat4;
-use boba_core::{pearl::SimpleEvent, world::Link};
+use boba_core::world::Link;
 use wgpu::{CommandBuffer, TextureView};
 
 use crate::pearls::TaroCamera;
@@ -12,8 +12,6 @@ pub struct TaroRender {
     link: Link<TaroCamera>,
     buffers: Vec<(usize, CommandBuffer)>,
 }
-
-impl SimpleEvent for TaroRender {}
 
 impl TaroRender {
     pub(crate) fn new(

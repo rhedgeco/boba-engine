@@ -72,7 +72,7 @@ pub impl TaroCameraView for PearlView<'_, '_, TaroCamera> {
         render_event.queue(0, encoder.finish());
 
         // trigger the render event on all listeners
-        self.world_mut().trigger_simple(&mut render_event);
+        self.world_mut().trigger(&mut render_event);
 
         // submit the encoder to be rendered
         hardware.queue().submit(render_event);

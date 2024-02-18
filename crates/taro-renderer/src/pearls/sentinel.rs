@@ -4,7 +4,7 @@ use boba_core::{
     Pearl,
 };
 use milk_tea::{
-    events::{Data, MilkTea, Update},
+    events::{MilkTea, Update},
     pearls::Window,
 };
 
@@ -19,7 +19,7 @@ impl Pearl for TaroSentinel {
 }
 
 impl Listener<MilkTea<Update>> for TaroSentinel {
-    fn trigger(pearl: PearlView<Self>, event: &mut Data<Update>) {
+    fn trigger(pearl: PearlView<Self>, event: &mut MilkTea<Update>) {
         if !pearl.world().has::<Window<TaroRenderer>>() {
             event.exit_app()
         }

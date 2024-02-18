@@ -1,16 +1,10 @@
 use crate::world::{Inserted, PearlView, Removed};
 
-pub trait Event: 'static {
-    type Data<'a>;
-}
-
-pub trait SimpleEvent: 'static {}
-impl<T: SimpleEvent> Event for T {
-    type Data<'a> = Self;
-}
+pub trait Event: 'static {}
+impl<T: 'static> Event for T {}
 
 pub trait Listener<E: Event>: Pearl {
-    fn trigger(pearl: PearlView<Self>, event: &mut E::Data<'_>);
+    fn trigger(pearl: PearlView<Self>, event: &mut E);
 }
 
 pub trait EventSource<P> {

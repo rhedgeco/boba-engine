@@ -1,12 +1,8 @@
 use winit::{dpi::PhysicalSize, window::WindowId};
 
-use super::base::SimpleMilkTeaEvent;
-
 pub struct Close {
     id: WindowId,
 }
-
-impl SimpleMilkTeaEvent for Close {}
 
 impl Close {
     pub(crate) fn new(id: WindowId) -> Self {
@@ -22,8 +18,6 @@ pub struct Redraw {
     id: WindowId,
 }
 
-impl SimpleMilkTeaEvent for Redraw {}
-
 impl Redraw {
     pub(crate) fn new(id: WindowId) -> Self {
         Self { id }
@@ -38,8 +32,6 @@ pub struct Resize {
     size: PhysicalSize<u32>,
     id: WindowId,
 }
-
-impl SimpleMilkTeaEvent for Resize {}
 
 impl Resize {
     pub(crate) fn new(id: WindowId, size: PhysicalSize<u32>) -> Self {
@@ -59,8 +51,6 @@ pub struct Focus {
     focused: bool,
     id: WindowId,
 }
-
-impl SimpleMilkTeaEvent for Focus {}
 
 impl Focus {
     pub(crate) fn new(id: WindowId, focused: bool) -> Self {

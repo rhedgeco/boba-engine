@@ -12,11 +12,7 @@ use handle_map::{
 use hashbrown::HashMap;
 use indexmap::IndexMap;
 
-use crate::{
-    pearl::{Event, SimpleEvent},
-    world::WorldQueue,
-    Pearl,
-};
+use crate::{pearl::Event, world::WorldQueue, Pearl};
 
 use super::PearlView;
 
@@ -102,7 +98,7 @@ impl MapData {
     }
 }
 
-type EventFn<E> = fn(&mut WorldQueue, &mut <E as Event>::Data<'_>);
+type EventFn<E> = fn(&mut WorldQueue, &mut E);
 type EventMap<E> = IndexMap<TypeId, EventFn<E>>;
 
 /// A storage solution for multiple all types of [`Pearl`] structs.
@@ -304,16 +300,12 @@ impl World {
         }
     }
 
-    pub fn trigger_simple<E: SimpleEvent>(&mut self, data: &mut E) {
-        self.trigger::<E>(data);
-    }
-
-    pub fn trigger<E: Event>(&mut self, data: &mut E::Data<'_>) {
+    pub fn trigger<E: Event>(&mut self, data: &mut E) {
         let mut queue = WorldQueue::new(self);
         Self::trigger_nested::<E>(&mut queue, data);
     }
 
-    pub(crate) fn trigger_nested<E: Event>(queue: &mut WorldQueue, data: &mut E::Data<'_>) {
+    pub(crate) fn trigger_nested<E: Event>(queue: &mut WorldQueue, data: &mut E) {
         let Some(anymap) = queue.world.events.get(&TypeId::of::<E>()) else {
             return;
         };

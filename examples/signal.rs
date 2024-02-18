@@ -12,7 +12,7 @@ impl Pearl for SignalEmitter {
 }
 
 impl Listener<MilkTea<Update>> for SignalEmitter {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Update>) {
+    fn trigger(mut pearl: PearlView<Self>, event: &mut MilkTea<Update>) {
         let signal = pearl.signal.build(format!("Hello, World!"));
         pearl.world_mut().send_signal(signal);
         event.exit_app();

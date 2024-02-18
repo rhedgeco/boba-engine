@@ -20,7 +20,7 @@ impl Pearl for TransformRotator {
 }
 
 impl Listener<MilkTea<Update>> for TransformRotator {
-    fn trigger(mut view: PearlView<Self>, event: &mut Data<Update>) {
+    fn trigger(mut view: PearlView<Self>, event: &mut MilkTea<Update>) {
         view.current = (view.current + view.speed * event.delta_time()) % 360f32;
         let rotation = view.current;
         let transform = view.transform;
@@ -40,7 +40,7 @@ impl Pearl for TransformPrinter {
 }
 
 impl Listener<MilkTea<Update>> for TransformPrinter {
-    fn trigger(mut view: PearlView<Self>, _: &mut Data<Update>) {
+    fn trigger(mut view: PearlView<Self>, _: &mut MilkTea<Update>) {
         let transform = view.transform;
         let transform = view.get_view(transform).unwrap();
         println!("Child world_pos: {}", transform.world_pos());

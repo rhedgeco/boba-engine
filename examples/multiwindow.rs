@@ -11,7 +11,7 @@ impl Pearl for StatePrinter {
 }
 
 impl Listener<MilkTea<Focus>> for StatePrinter {
-    fn trigger(_: PearlView<Self>, event: &mut Data<Focus>) {
+    fn trigger(_: PearlView<Self>, event: &mut MilkTea<Focus>) {
         if event.focused() {
             println!("Window {:?} focused.", event.window_id());
         }
@@ -19,7 +19,7 @@ impl Listener<MilkTea<Focus>> for StatePrinter {
 }
 
 impl Listener<MilkTea<Close>> for StatePrinter {
-    fn trigger(_: PearlView<Self>, event: &mut Data<Close>) {
+    fn trigger(_: PearlView<Self>, event: &mut MilkTea<Close>) {
         println!("Closing Window {:?}.", event.window_id());
     }
 }

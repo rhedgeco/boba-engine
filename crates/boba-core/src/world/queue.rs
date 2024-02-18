@@ -1,9 +1,6 @@
 use indexmap::IndexSet;
 
-use crate::{
-    pearl::{Event, SimpleEvent},
-    Pearl, World,
-};
+use crate::{pearl::Event, Pearl, World};
 
 use super::{Iter, IterMut, Link, Links, LinksCopied, PearlView, Pearls, PearlsMut};
 
@@ -95,11 +92,7 @@ impl<'a> WorldQueue<'a> {
         self.world.iter_mut()
     }
 
-    pub fn trigger_simple<E: SimpleEvent>(&mut self, data: &mut E) {
-        self.trigger::<E>(data);
-    }
-
-    pub fn trigger<E: Event>(&mut self, data: &mut E::Data<'_>) {
+    pub fn trigger<E: Event>(&mut self, data: &mut E) {
         World::trigger_nested::<E>(self, data);
     }
 

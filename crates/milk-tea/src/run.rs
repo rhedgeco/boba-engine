@@ -8,7 +8,7 @@ use crate::events::{
     app::{Init, Resume, Suspend},
     base::EventTimer,
     window::{Close, Focus, Redraw, Resize},
-    MilkTea, Update,
+    Update,
 };
 
 pub fn run(world: &mut World) {
@@ -36,49 +36,34 @@ pub fn run_with_flow(world: &mut World, poll: bool) {
 
     // run the event loop
     if let Err(error) = event_loop.run(move |event, target| {
+        let executor = timer.next(target);
         match event {
             Event::NewEvents(StartCause::Init) => {
-                // initial update of timer to start game time
-                timer.update_timer();
-
-                // then run the init event
-                let event = &mut timer.build_simple(Init::new(), target);
-                world.trigger::<MilkTea<Init>>(event);
+                executor.trigger(world, Init::new());
             }
             Event::Resumed => {
-                let event = &mut timer.build_simple(Resume::new(), target);
-                world.trigger::<MilkTea<Resume>>(event);
+                executor.trigger(world, Resume::new());
             }
             Event::Suspended => {
-                let event = &mut timer.build_simple(Suspend::new(), target);
-                world.trigger::<MilkTea<Suspend>>(event);
+                executor.trigger(world, Suspend::new());
             }
             Event::WindowEvent { window_id, event } => match event {
                 WindowEvent::RedrawRequested => {
-                    let event = &mut timer.build_simple(Redraw::new(window_id), target);
-                    world.trigger::<MilkTea<Redraw>>(event);
+                    executor.trigger(world, Redraw::new(window_id));
                 }
                 WindowEvent::CloseRequested => {
-                    let event = &mut timer.build_simple(Close::new(window_id), target);
-                    world.trigger::<MilkTea<Close>>(event);
+                    executor.trigger(world, Close::new(window_id));
                 }
                 WindowEvent::Resized(size) => {
-                    let event = &mut timer.build_simple(Resize::new(window_id, size), target);
-                    world.trigger::<MilkTea<Resize>>(event);
+                    executor.trigger(world, Resize::new(window_id, size));
                 }
                 WindowEvent::Focused(focused) => {
-                    let event = &mut timer.build_simple(Focus::new(window_id, focused), target);
-                    world.trigger::<MilkTea<Focus>>(event);
+                    executor.trigger(world, Focus::new(window_id, focused));
                 }
                 _ => (),
             },
             Event::AboutToWait => {
-                // trigger a world update
-                let event = &mut timer.build_simple(Update, target);
-                world.trigger::<MilkTea<Update>>(event);
-
-                // update the inner timer values
-                timer.update_timer();
+                executor.trigger(world, Update::new());
             }
             _ => (),
         }

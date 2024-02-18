@@ -9,7 +9,7 @@ impl Pearl for FpsPrinter {
 }
 
 impl Listener<MilkTea<Update>> for FpsPrinter {
-    fn trigger(_: PearlView<Self>, event: &mut Data<Update>) {
+    fn trigger(_: PearlView<Self>, event: &mut MilkTea<Update>) {
         println!("FPS: {}", 1. / event.delta_time());
     }
 }

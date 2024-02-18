@@ -12,7 +12,6 @@ use winit::{
 };
 
 use crate::events::{
-    base::Data,
     window::{Close, Redraw},
     MilkTea, Update,
 };
@@ -85,7 +84,7 @@ impl<T: Renderer> Pearl for Window<T> {
 }
 
 impl<T: Renderer> Listener<MilkTea<Redraw>> for Window<T> {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Redraw>) {
+    fn trigger(mut pearl: PearlView<Self>, event: &mut MilkTea<Redraw>) {
         let Some(window) = pearl.window.as_ref() else {
             return;
         };
@@ -99,7 +98,7 @@ impl<T: Renderer> Listener<MilkTea<Redraw>> for Window<T> {
 }
 
 impl<T: Renderer> Listener<MilkTea<Close>> for Window<T> {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Close>) {
+    fn trigger(mut pearl: PearlView<Self>, event: &mut MilkTea<Close>) {
         let Some(window) = pearl.window.as_ref() else {
             return;
         };
@@ -113,7 +112,7 @@ impl<T: Renderer> Listener<MilkTea<Close>> for Window<T> {
 }
 
 impl<T: Renderer> Listener<MilkTea<Update>> for Window<T> {
-    fn trigger(mut pearl: PearlView<Self>, event: &mut Data<Update>) {
+    fn trigger(mut pearl: PearlView<Self>, event: &mut MilkTea<Update>) {
         let window = match &pearl.window {
             Some(window) => window,
             None => {

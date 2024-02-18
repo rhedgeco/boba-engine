@@ -1,10 +1,6 @@
-use super::base::SimpleMilkTeaEvent;
-
 pub struct Init {
     _private: (),
 }
-
-impl SimpleMilkTeaEvent for Init {}
 
 impl Init {
     pub(crate) fn new() -> Self {
@@ -16,8 +12,6 @@ pub struct Suspend {
     _private: (),
 }
 
-impl SimpleMilkTeaEvent for Suspend {}
-
 impl Suspend {
     pub(crate) fn new() -> Self {
         Self { _private: () }
@@ -27,8 +21,6 @@ impl Suspend {
 pub struct Resume {
     _private: (),
 }
-
-impl SimpleMilkTeaEvent for Resume {}
 
 impl Resume {
     pub(crate) fn new() -> Self {
