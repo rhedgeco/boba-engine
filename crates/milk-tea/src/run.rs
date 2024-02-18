@@ -5,10 +5,9 @@ use winit::{
 };
 
 use crate::events::{
-    app::{Init, Resume, Suspend},
-    base::EventTimer,
+    app::{Init, Resume, Suspend, Update},
+    milktea::EventTimer,
     window::{Close, Focus, Redraw, Resize},
-    Update,
 };
 
 pub fn run(world: &mut World) {

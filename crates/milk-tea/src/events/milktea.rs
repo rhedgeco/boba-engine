@@ -6,16 +6,6 @@ use std::{
 use boba_core::World;
 use winit::event_loop::EventLoopWindowTarget;
 
-pub struct Update {
-    _private: (),
-}
-
-impl Update {
-    pub(crate) fn new() -> Self {
-        Self { _private: () }
-    }
-}
-
 struct TimerData {
     start: Instant,
     update: Instant,

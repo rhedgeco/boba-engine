@@ -1,5 +1,5 @@
 pub mod app;
-pub mod base;
+pub mod milktea;
 pub mod window;
 
-pub use base::{MilkTea, Update};
+pub use milktea::MilkTea;

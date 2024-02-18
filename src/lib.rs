@@ -11,7 +11,7 @@ pub mod prelude {
 
     pub use boba_3d::{glam::*, transform::TransformView, Transform};
     pub use milk_tea::{
-        events::{MilkTea, Update},
+        events::{app::Update, MilkTea},
         pearls::Window,
     };
     pub use taro_renderer::{

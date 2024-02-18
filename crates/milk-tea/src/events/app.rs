@@ -27,3 +27,13 @@ impl Resume {
         Self { _private: () }
     }
 }
+
+pub struct Update {
+    _private: (),
+}
+
+impl Update {
+    pub(crate) fn new() -> Self {
+        Self { _private: () }
+    }
+}

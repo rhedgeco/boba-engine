@@ -4,7 +4,7 @@ use boba_core::{
     Pearl,
 };
 use milk_tea::{
-    events::{MilkTea, Update},
+    events::{app::Update, MilkTea},
     pearls::Window,
 };
 

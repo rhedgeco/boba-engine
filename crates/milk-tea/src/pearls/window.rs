@@ -12,8 +12,9 @@ use winit::{
 };
 
 use crate::events::{
+    app::Update,
     window::{Close, Redraw},
-    MilkTea, Update,
+    MilkTea,
 };
 
 pub trait WindowHandle: HasWindowHandle + HasDisplayHandle + Send + Sync + 'static {}
