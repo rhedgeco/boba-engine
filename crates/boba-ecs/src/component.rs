@@ -6,7 +6,7 @@ use std::{
 use derivative::Derivative;
 use derive_more::Display;
 
-use crate::UniqueId;
+use crate::{UniqueId, store::StoreKind};
 
 #[repr(transparent)]
 #[derive(Display, Derivative)]
@@ -66,12 +66,8 @@ impl<T> DerefMut for Component<T> {
     }
 }
 
-pub enum ComponentStore {
-    Sparse,
-}
-
 pub trait ComponentDef: 'static {
-    const STORE: ComponentStore;
+    const STORE: StoreKind;
 }
 
 pub trait IntoComponent: ComponentDef {

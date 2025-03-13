@@ -5,8 +5,8 @@ use fxhash::{FxBuildHasher, FxHashMap};
 
 use crate::{
     Component, UniqueId,
-    component::{ComponentDef, ComponentId, ComponentStore},
-    store::SparseStore,
+    component::{ComponentDef, ComponentId},
+    store::{SparseStore, StoreKind},
 };
 
 #[repr(transparent)]
@@ -104,7 +104,7 @@ impl<'a> EntityMut<'a> {
 
     pub fn attach<T: ComponentDef>(&mut self, component: Component<T>) -> Option<Component<T>> {
         match T::STORE {
-            ComponentStore::Sparse => {
+            StoreKind::Sparse => {
                 self.world.component_links.insert(
                     component.id().into_raw(),
                     ComponentLink::Sparse(self.link.sparse_index),
